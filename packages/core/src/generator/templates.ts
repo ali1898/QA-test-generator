@@ -44,12 +44,12 @@ export function packageJson(o: ScaffoldOptions): FileSpec {
     "frontend": "node frontend/server.js",
     "cy:open": "cypress open",
     "cy:run": "cypress run",
-    "cy:smoke": "cypress run --env CYPRESS_UNIQUE_ID=smoke --spec \"cypress/e2e/test/smoke/**/*.cy.ts\"",
+    "cy:smoke": "cypress run --env CYPRESS_UNIQUE_ID=smoke,allureResultsPath=allure-results/smoke --spec \"cypress/e2e/test/smoke/**/*.cy.ts\"",
     "cy:smoke:clean": "rimraf allure-results/smoke allure-report/smoke",
     "cy:smoke:report": "node scripts/allure/generate.js allure-results/smoke --clean -o allure-report/smoke",
     "cy:smoke:copy-serve": "node scripts/serve/copy.js allure-report/smoke",
     "cy:smoke:all": "node scripts/run-all.js smoke",
-    "cy:regression": "cypress run --env CYPRESS_UNIQUE_ID=regression --spec \"cypress/e2e/test/regression/**/*.cy.ts\"",
+    "cy:regression": "cypress run --env CYPRESS_UNIQUE_ID=regression,allureResultsPath=allure-results/regression --spec \"cypress/e2e/test/regression/**/*.cy.ts\"",
     "cy:regression:clean": "rimraf allure-results/regression allure-report/regression",
     "cy:regression:report": "node scripts/allure/generate.js allure-results/regression --clean -o allure-report/regression",
     "cy:regression:copy-serve": "node scripts/serve/copy.js allure-report/regression",
@@ -63,7 +63,7 @@ export function packageJson(o: ScaffoldOptions): FileSpec {
   };
 
   if (o.bdd) {
-    scripts["cy:bdd"] = "cypress run --env CYPRESS_UNIQUE_ID=bdd --spec \"cypress/e2e/features/**/*.feature\"";
+    scripts["cy:bdd"] = "cypress run --env CYPRESS_UNIQUE_ID=bdd,allureResultsPath=allure-results/bdd --spec \"cypress/e2e/features/**/*.feature\"";
     scripts["cy:bdd:clean"] = "rimraf allure-results/bdd allure-report/bdd";
     scripts["cy:bdd:report"] = "node scripts/allure/generate.js allure-results/bdd --clean -o allure-report/bdd";
     scripts["cy:bdd:copy-serve"] = "node scripts/serve/copy.js allure-report/bdd";
@@ -1391,7 +1391,7 @@ Feature: ورود به سیستم (Login)
 
 export function sampleStepsTs(): FileSpec {
   const content = `import { Given, When, Then } from "@badeball/cypress-cucumber-preprocessor";
-import { loginPage } from "../../pages/loginPage";
+import { loginPage } from "../pages/loginPage";
 
 Given("کاربر در صفحه لاگین قرار دارد", () => {
   loginPage.visit();
@@ -1409,7 +1409,7 @@ When("روی دکمه ورود کلیک می‌کند", () => {
 });
 
 When(
-  "رمز عبور {string} را وارد می‌کند (بدون نام کاربری)",
+  "رمز عبور {string} را وارد می‌کند \\(بدون نام کاربری\\)",
   (password: string) => {
     loginPage.fillPassword(password);
   }
@@ -1432,7 +1432,7 @@ Then("پیام خطای معتبر نمایش داده می‌شود", () => {
 
 export function sampleStepsJs(): FileSpec {
   const content = `const { Given, When, Then } = require("@badeball/cypress-cucumber-preprocessor");
-const { loginPage } = require("../../pages/loginPage");
+const { loginPage } = require("../pages/loginPage");
 
 Given("کاربر در صفحه لاگین قرار دارد", () => {
   loginPage.visit();
@@ -1450,7 +1450,7 @@ When("روی دکمه ورود کلیک می‌کند", () => {
 });
 
 When(
-  "رمز عبور {string} را وارد می‌کند (بدون نام کاربری)",
+  "رمز عبور {string} را وارد می‌کند \\(بدون نام کاربری\\)",
   (password) => {
     loginPage.fillPassword(password);
   }
@@ -1780,7 +1780,7 @@ for (const { src, dst } of files) {
 export function scriptsServeReportSh(_o: ScaffoldOptions): FileSpec {
   const content = `#!/bin/bash
 DIR="$(cd "$(dirname "$0")" && pwd)"
-node "$DIR/index.js" "$@"
+node "$DIR/serve.js" "$@"
 `;
   return { path: "scripts/serve/report.sh", content };
 }
@@ -1788,7 +1788,7 @@ node "$DIR/index.js" "$@"
 export function scriptsServeReportCmd(_o: ScaffoldOptions): FileSpec {
   const content = `@echo off
 cd /d "%~dp0"
-node index.js %*
+node serve.js %*
 pause
 `;
   return { path: "scripts/serve/report.cmd", content };
