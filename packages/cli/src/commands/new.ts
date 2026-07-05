@@ -23,14 +23,15 @@ export interface NewOptions {
 }
 
 export async function newCommand(opts: NewOptions): Promise<void> {
-  console.log(chalk.cyan(`
-   ██████  ██     ███████     ████████ ███████ ███████ ████████
-  ██       ██        ███        ██    ██      ██         ██
-  ██   ███ ██       ███         ██    █████   ███████    ██
-  ██    ██ ██      ███          ██    ██           ██    ██
-   ██████  ██████ ███████       ██    ███████ ███████    ██
+  console.log(
+    chalk.hex("#00d4ff")(`
+   ██████  ██     ███████     ${chalk.hex("#ff6b6b")("████████")} ${chalk.hex("#feca57")("███████")} ${chalk.hex("#48dbfb")("███████")} ${chalk.hex("#ff9ff3")("████████")}
+  ${chalk.hex("#00d4ff")("██")}       ${chalk.hex("#00d4ff")("██")}        ${chalk.hex("#ff6b6b")("███")}        ${chalk.hex("#ff6b6b")("██")}    ${chalk.hex("#feca57")("██")}      ${chalk.hex("#48dbfb")("██")}         ${chalk.hex("#ff9ff3")("██")}
+  ${chalk.hex("#00d4ff")("██")}   ${chalk.hex("#00d4ff")("███")} ${chalk.hex("#00d4ff")("██")}       ${chalk.hex("#ff6b6b")("███")}         ${chalk.hex("#ff6b6b")("██")}    ${chalk.hex("#feca57")("█████")}   ${chalk.hex("#48dbfb")("███████")}    ${chalk.hex("#ff9ff3")("██")}
+  ${chalk.hex("#00d4ff")("██")}    ${chalk.hex("#00d4ff")("██")} ${chalk.hex("#00d4ff")("██")}      ${chalk.hex("#ff6b6b")("███")}          ${chalk.hex("#ff6b6b")("██")}    ${chalk.hex("#feca57")("██")}           ${chalk.hex("#48dbfb")("██")}    ${chalk.hex("#ff9ff3")("██")}
+   ${chalk.hex("#00d4ff")("██████")}  ${chalk.hex("#00d4ff")("██████")} ${chalk.hex("#ff6b6b")("███████")}       ${chalk.hex("#ff6b6b")("██")}    ${chalk.hex("#feca57")("███████")} ${chalk.hex("#48dbfb")("███████")}    ${chalk.hex("#ff9ff3")("██")}
 `));
-  ui.header("Create a Cypress project");
+  ui.header("🚀 Create a Cypress project");
 
   // ── Gather inputs (skip prompts when --yes and a value is provided) ──
   const projectName =
@@ -103,13 +104,16 @@ export async function newCommand(opts: NewOptions): Promise<void> {
   console.log();
   ui.dim(`  ${result.files.length} files written.`);
   console.log();
-  console.log(chalk.bold("Next steps:"));
-  console.log(chalk.dim("  cd ") + resolve(targetDir));
-  console.log(chalk.dim("  npm run setup        # Check & install deps (Node, Java, Cypress)"));
-  console.log(chalk.dim("  npm run frontend      # Start the sample app on :3000"));
-  console.log(chalk.dim("  ") + (bdd ? "npx cypress open   # Run the sample feature" : "npx cypress open"));
-  console.log(chalk.dim("  npm test             # Run smoke tests"));
+  console.log(chalk.bold.hex("#feca57")("\n🎯 Next steps"));
+  console.log(chalk.dim("  ─────────────────────────────────────────────"));
+  console.log(chalk.hex("#48dbfb")("  1.") + chalk.dim("  cd ") + chalk.bold(resolve(targetDir)));
+  console.log(chalk.hex("#48dbfb")("  2.") + chalk.dim("  npm run setup        ") + chalk.hex("#ff9ff3")("Check & install deps (Node, Java, Cypress)"));
+  console.log(chalk.hex("#48dbfb")("  3.") + chalk.dim("  npm run frontend      ") + chalk.hex("#ff9ff3")("Start the sample app on :3000"));
+  console.log(chalk.hex("#48dbfb")("  4.") + chalk.dim("  ") + (bdd ? "npx cypress open   " : "npx cypress open    ") + chalk.hex("#ff9ff3")("Run the sample " + (bdd ? "feature" : "test")));
+  console.log(chalk.hex("#48dbfb")("  5.") + chalk.dim("  npm test             ") + chalk.hex("#ff9ff3")("Run smoke tests"));
+  console.log(chalk.dim("  ─────────────────────────────────────────────"));
   console.log();
-  console.log(chalk.dim("  Tip: on Windows, use 'npx qa' or 'npm run qa' instead of bare 'qa'."));
-  ui.dim(`Tip: run ${chalk.bold('"qa generate test"')} inside the project to add more tests.`);
+  console.log(chalk.hex("#ff6b6b")("  💡") + chalk.dim("  Windows: use ") + chalk.bold("npx qa") + chalk.dim(" or ") + chalk.bold("npm run qa"));
+  console.log(chalk.hex("#feca57")("  ⚡") + chalk.dim(`  Run `) + chalk.bold("qa generate test") + chalk.dim(" inside the project to add more tests."));
+  console.log();
 }

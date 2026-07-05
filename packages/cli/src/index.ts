@@ -11,13 +11,20 @@ import { docsCommand, type DocsOptions } from "./commands/docs";
 import { modelsCommand } from "./commands/models";
 import { generateGuideCommand } from "./commands/generate-guide";
 
-const BANNER = chalk.cyan(`
-   ██████  ██     ███████     ████████ ███████ ███████ ████████
-  ██       ██        ███        ██    ██      ██         ██
-  ██   ███ ██       ███         ██    █████   ███████    ██
-  ██    ██ ██      ███          ██    ██           ██    ██
-   ██████  ██████ ███████       ██    ███████ ███████    ██
-`) + chalk.dim(`  Cypress Test Generator v${CORE_VERSION} — POM + BDD + Allure + AI`) + "\n";
+const BANNER =
+  chalk.hex("#00d4ff")(`
+   ██████  ██     ███████     ${chalk.hex("#ff6b6b")("████████")} ${chalk.hex("#feca57")("███████")} ${chalk.hex("#48dbfb")("███████")} ${chalk.hex("#ff9ff3")("████████")}
+  ${chalk.hex("#00d4ff")("██")}       ${chalk.hex("#00d4ff")("██")}        ${chalk.hex("#ff6b6b")("███")}        ${chalk.hex("#ff6b6b")("██")}    ${chalk.hex("#feca57")("██")}      ${chalk.hex("#48dbfb")("██")}         ${chalk.hex("#ff9ff3")("██")}
+  ${chalk.hex("#00d4ff")("██")}   ${chalk.hex("#00d4ff")("███")} ${chalk.hex("#00d4ff")("██")}       ${chalk.hex("#ff6b6b")("███")}         ${chalk.hex("#ff6b6b")("██")}    ${chalk.hex("#feca57")("█████")}   ${chalk.hex("#48dbfb")("███████")}    ${chalk.hex("#ff9ff3")("██")}
+  ${chalk.hex("#00d4ff")("██")}    ${chalk.hex("#00d4ff")("██")} ${chalk.hex("#00d4ff")("██")}      ${chalk.hex("#ff6b6b")("███")}          ${chalk.hex("#ff6b6b")("██")}    ${chalk.hex("#feca57")("██")}           ${chalk.hex("#48dbfb")("██")}    ${chalk.hex("#ff9ff3")("██")}
+   ${chalk.hex("#00d4ff")("██████")}  ${chalk.hex("#00d4ff")("██████")} ${chalk.hex("#ff6b6b")("███████")}       ${chalk.hex("#ff6b6b")("██")}    ${chalk.hex("#feca57")("███████")} ${chalk.hex("#48dbfb")("███████")}    ${chalk.hex("#ff9ff3")("██")}
+`) +
+  chalk.dim(`  ╰─ ${chalk.bold.white("QA Test Generator")} v${CORE_VERSION}  ·  `) +
+  chalk.hex("#feca57")("POM") + chalk.dim(" + ") +
+  chalk.hex("#48dbfb")("BDD") + chalk.dim(" + ") +
+  chalk.hex("#ff9ff3")("Allure") + chalk.dim(" + ") +
+  chalk.hex("#00d4ff")("AI") +
+  "\n";
 
 const program = new Command();
 
@@ -29,39 +36,42 @@ program
   .addHelpText(
     "after",
     `
-Examples:
-  # ——— Project scaffolding ———
-  $ qa new                                                           # Interactive wizard
-  $ qa new --name my-app --language typescript --bdd --allure        # Quick scaffold with flags
-  $ qa new --name my-app -l typescript --no-bdd --no-allure -y       # Non-interactive, minimal
-  $ qa new --name demo -p ./demo -d "My demo project" --baseUrl http://localhost:3000
+${chalk.bold.hex("#feca57")("⚡ Commands")}
 
-  # ——— AI-assisted test generation (inside a Cypress project) ———
+  ${chalk.bold("qa new")}            ${chalk.dim("Scaffold a complete Cypress project (POM + BDD + Allure)")}
+  ${chalk.bold("qa generate")}       ${chalk.dim("Generate tests / pages / locators / helpers / BDD with AI")}
+  ${chalk.bold("qa generate-guide")} ${chalk.dim("Create a Structure Guide from an existing project")}
+  ${chalk.bold("qa chat")}           ${chalk.dim("Interactive QA assistant (supports --guide for context)")}
+  ${chalk.bold("qa docs")}           ${chalk.dim("Generate Markdown/HTML docs + publish to Confluence")}
+  ${chalk.bold("qa config")}         ${chalk.dim("Manage LLM providers (local + cloud)")}
+  ${chalk.bold("qa models")}         ${chalk.dim("List models from the active provider")}
+
+${chalk.bold.hex("#48dbfb")("📦 Examples")}
+
+  ${chalk.dim("# — Scaffold a project —")}
+  $ qa new
+  $ qa new --name my-app -l typescript --bdd --allure -y
+
+  ${chalk.dim("# — Generate artifacts with AI —")}
   $ qa generate test -g "login with empty fields should show error"
   $ qa generate page -g "user profile page"
-  $ qa generate locators -g "locators for the checkout form"
-  $ qa generate helper -g "generate random Iranian national code and phone number"
-  $ qa generate bdd -g "checkout scenario with valid coupon"
+  $ qa generate bdd -g "checkout with valid coupon"
+  $ qa generate locators -g "checkout form elements" --guide ./guides/my-guide.md
 
-  # ——— Generate with a Structure Guide (follow an existing project's conventions) ———
-  $ qa generate-guide -p ./my-project -o ./guides/my-guide.md        # Create a guide from a project
-  $ qa generate test -g "login test" --guide ./guides/my-guide.md    # Generate code following the guide
-  $ qa generate page -g "profile page" --guide ./guides/my-guide.md
+  ${chalk.dim("# — Learn from existing projects —")}
+  $ qa generate-guide -p ./my-project -o ./guides/my-guide.md
+  $ qa generate test -g "login test" --guide ./guides/my-guide.md
 
-  # ——— Chat with AI QA assistant ———
-  $ qa chat
-  $ qa chat --guide ./guides/my-guide.md                             # Chat with project context
+  ${chalk.dim("# — Chat with context —")}
+  $ qa chat --guide ./guides/my-guide.md
 
-  # ——— Documentation ———
-  $ qa docs                                                         # Markdown docs from existing project
-  $ qa docs --confluence --confluence-config ./confluence.json       # Publish to Confluence
+  ${chalk.dim("# — Docs & config —")}
+  $ qa docs --confluence --confluence-config ./confluence.json
+  $ qa config
+  $ qa models
 
-  # ——— Configuration ———
-  $ qa config                                                       # Set up LLM provider keys
-  $ qa models                                                       # List available AI models
-
-Note:
-  Windows users: use 'npm run qa' or 'npx qa' instead of bare 'qa'.
+${chalk.dim("╭─")} ${chalk.hex("#ff6b6b")("💡")} ${chalk.dim("Windows users: use")} ${chalk.bold("npm run qa")} ${chalk.dim("or")} ${chalk.bold("npx qa")} ${chalk.dim("instead of bare")} ${chalk.bold("qa")} ${chalk.dim("─╮")}
+${chalk.dim("╰─")} ${chalk.hex("#feca57")("🐞")} ${chalk.dim("Report issues:")} ${chalk.underline("https://github.com/anomalyco/QA-test-generator/issues")} ${chalk.dim("─╯")}
 `,
   )
   .hook("preAction", () => {

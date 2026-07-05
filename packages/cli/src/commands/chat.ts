@@ -11,12 +11,14 @@ export interface ChatOptions {
 }
 
 export async function chatCommand(opts: ChatOptions = {}): Promise<void> {
-  ui.header("QA Chat");
-  ui.dim(`Provider: ${activeBanner()}`);
+  console.log(chalk.hex("#00d4ff")("\n╭──────────────────────────────────────────────╮"));
+  console.log(chalk.hex("#00d4ff")("│") + chalk.bold.white("          🤖 QA Chat Assistant            ") + chalk.hex("#00d4ff")(" │"));
+  console.log(chalk.hex("#00d4ff")("╰──────────────────────────────────────────────╯"));
+  console.log(chalk.hex("#48dbfb")("  Provider: ") + chalk.bold(activeBanner()));
   if (opts.guide) {
-    ui.dim(`Guide: ${opts.guide}`);
+    console.log(chalk.hex("#feca57")("  Guide: ") + chalk.dim(opts.guide));
   }
-  console.log(chalk.dim('  Type your question. "/help" for commands, "/exit" to quit.\n'));
+  console.log(chalk.dim('\n  Type your question. "/help" for commands, "/exit" to quit.\n'));
 
   // Load guide context if provided
   let guideContext: string | undefined;

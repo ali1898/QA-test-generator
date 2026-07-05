@@ -15,6 +15,10 @@ npx qa new my-qa-project
 - **Sample frontend app** — a login page + dashboard with an HTTP API (Node.js), ready for your tests
 - **CI/CD** — Azure Pipelines YAML included
 - **TypeScript first** — full type declarations, path aliases (`@fixtures/`, `@support/`)
+- **AI-Powered Generation** — generate tests, pages, locators, and helpers from natural language
+- **Structure Guides** — analyze existing projects, generate code that follows their conventions
+- **Interactive QA Chat** — conversational AI assistant with project context support
+- **Test Tiers** — organize tests into `smoke` and `regression` suites
 
 ## Quick Start
 
@@ -38,28 +42,31 @@ npm run cy:smoke:all
 
 ```
 my-e2e-project/
-├── frontend/                  # Sample app (login + dashboard)
-│   ├── server.js              # HTTP API (port 3000)
-│   ├── index.html             # Login page
-│   └── dashboard.html         # Post-login dashboard
+├── frontend/                     # Sample app (login + dashboard)
+│   ├── server.js                 # HTTP API (port 3000)
+│   ├── index.html                # Login page
+│   └── dashboard.html            # Post-login dashboard
 ├── cypress/
 │   ├── e2e/
-│   │   ├── locators/          # data-cy selectors
-│   │   ├── pages/             # Page Object classes
-│   │   ├── features/          # .feature files (BDD)
-│   │   ├── step-definitions/  # Step implementations
+│   │   ├── locators/             # data-cy selectors (PascalLocators.ts)
+│   │   ├── pages/                # Page Object classes (PascalPage.ts)
+│   │   ├── features/             # .feature files (BDD)
+│   │   ├── step-definitions/     # Step implementations
 │   │   └── test/
-│   │       ├── smoke/         # Fast sanity checks
-│   │       └── regression/    # Full regression suite
+│   │       ├── smoke/            # Fast sanity checks (*.cy.ts)
+│   │       └── regression/       # Full regression suite (*.cy.ts)
 │   ├── fixtures/
-│   │   └── users.json         # Test user data
+│   │   └── users.json            # Test user data
 │   ├── support/
-│   │   ├── commands.ts        # Custom Cypress commands
-│   │   ├── index.d.ts         # Type declarations
-│   │   └── types/             # Shared interfaces
+│   │   ├── pages/                # Page Object classes
+│   │   ├── locators/             # Selector constants
+│   │   ├── helpers/              # Utility helpers (*.helper.ts)
+│   │   ├── commands.ts           # Custom Cypress commands
+│   │   ├── e2e.ts                # Global test config
+│   │   └── types/                # Shared interfaces
 │   └── utils/
-│       └── dataGenerator.ts   # Test data helpers
-├── scripts/                   # Allure, serve, orchestration
+│       └── dataGenerator.ts      # Test data helpers
+├── scripts/                      # Allure, serve, orchestration
 │   ├── allure/
 │   ├── serve/
 │   ├── run-all.js
@@ -72,16 +79,87 @@ my-e2e-project/
 
 ## CLI Usage
 
+### Project Scaffolding
+
 ```bash
-qa new [options] <project-name>
+qa new [options] [--name <name>]
 
 Options:
-  --typescript, --no-typescript   Use TypeScript (default: true)
-  --bdd <bool>                    Include BDD/Cucumber (default: true)
-  --allure <bool>                 Include Allure reporting (default: true)
+  -n, --name <name>               Project name (default: my-cypress-tests)
+  -p, --path <dir>                Target directory (default: ./<name>)
+  -l, --language <lang>           typescript | javascript (default: typescript)
+  --bdd / --no-bdd                Enable Cucumber BDD (default: true)
+  --allure / --no-allure          Enable Allure reporter (default: true)
   --baseUrl <url>                 Base URL for tests (default: http://localhost:3000)
-  --skip-install                  Skip npm install after scaffolding
+  -d, --description <text>        Project description
+  --install / --no-install        Run npm install (default: true)
   -y, --yes                       Skip all prompts
+```
+
+### AI-Assisted Test Generation
+
+```bash
+qa generate <type> [options]
+
+Types:
+  test         Generate a Cypress test spec
+  page         Generate a Page Object class
+  locators     Generate selector constants
+  helper       Generate a utility helper module
+  bdd          Generate BDD feature + step definitions
+
+Options:
+  -g, --goal <text>              Natural-language description of what to generate
+  -p, --project-root <dir>       Project root (default: cwd)
+  --guide <path>                 Path to a Structure Guide for project conventions
+  --tier <tier>                  Test tier: smoke (default) or regression
+  -y, --yes                      Skip confirmations
+```
+
+### Structure Guide (Learn from Existing Projects)
+
+```bash
+# Create a Structure Guide from an existing Cypress project
+qa generate-guide -p ./my-project -o ./guides/my-guide.md
+
+# Use the guide to generate code that follows the same conventions
+qa generate test -g "login test" --guide ./guides/my-guide.md
+qa generate page -g "profile page" --guide ./guides/my-guide.md
+qa generate locators -g "nav bar elements" --guide ./guides/my-guide.md
+
+# Chat with the guide as context
+qa chat --guide ./guides/my-guide.md
+```
+
+The Structure Guide system analyzes an existing project and extracts:
+- **Directory structure** — all folders, files, and their relationships
+- **Naming conventions** — file patterns for each layer (locators, pages, tests, etc.)
+- **Coding patterns** — class-vs-function style, imports, exports
+- **Custom Cypress commands** — registered via `Cypress.Commands.add`
+- **Output paths** — where each artifact type belongs
+
+Generated code automatically follows the guide's conventions, making it seamless to add tests to large existing projects.
+
+### Interactive QA Chat
+
+```bash
+qa chat
+qa chat --guide ./guides/my-guide.md    # Chat with project context
+```
+
+### Documentation
+
+```bash
+qa docs                                        # Generate Markdown + HTML docs
+qa docs --confluence --confluence-config ./confluence.json  # Publish to Confluence
+qa docs --no-file                              # Print to stdout
+```
+
+### Configuration
+
+```bash
+qa config      # Configure LLM providers (local + cloud)
+qa models      # List available models from the active provider
 ```
 
 ## Available npm Scripts

@@ -10,12 +10,12 @@ import ora from "ora";
 type Ora = ReturnType<typeof ora>;
 
 export const ui = {
-  info: (msg: string) => console.log(chalk.cyan("ℹ"), msg),
-  success: (msg: string) => console.log(chalk.green("✔"), msg),
-  warn: (msg: string) => console.log(chalk.yellow("!"), msg),
-  error: (msg: string) => console.error(chalk.red("✖"), msg),
+  info: (msg: string) => console.log(chalk.hex("#48dbfb")("ℹ"), chalk.dim(msg)),
+  success: (msg: string) => console.log(chalk.green("✔"), chalk.dim(msg)),
+  warn: (msg: string) => console.log(chalk.hex("#feca57")("⚠"), chalk.dim(msg)),
+  error: (msg: string) => console.error(chalk.hex("#ff6b6b")("✖"), chalk.dim(msg)),
   dim: (msg: string) => console.log(chalk.dim(msg)),
-  header: (msg: string) => console.log(chalk.bold.white.bgCyan(` ${msg} `)),
+  header: (msg: string) => console.log(`\n${chalk.bold.white.bgCyan(` ${msg} `)}\n`),
 };
 
 /** Run an async task with a spinner; returns its result or exits on error. */

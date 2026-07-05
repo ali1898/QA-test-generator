@@ -8,8 +8,10 @@ import { ui, withSpinner, chalk } from "../ui";
 import { activeBanner } from "./config";
 
 export async function modelsCommand(): Promise<void> {
-  ui.header("Available models");
-  ui.dim(`Provider: ${activeBanner()}\n`);
+  console.log(chalk.hex("#00d4ff")("\n╭──────────────────────────────────────────────╮"));
+  console.log(chalk.hex("#00d4ff")("│") + chalk.bold.white("           📡 Available Models              ") + chalk.hex("#00d4ff")(" │"));
+  console.log(chalk.hex("#00d4ff")("╰──────────────────────────────────────────────╯"));
+  console.log(chalk.hex("#48dbfb")("  Provider: ") + chalk.bold(activeBanner()) + "\n");
 
   const provider = getActiveProvider();
   const models = await withSpinner("Fetching models…", () => provider.listModels());
@@ -20,8 +22,9 @@ export async function modelsCommand(): Promise<void> {
   }
 
   for (const m of models) {
-    console.log(`  ${chalk.green("•")} ${m.id}${m.name && m.name !== m.id ? chalk.dim(`  (${m.name})`) : ""}`);
+    const bullet = chalk.hex("#feca57")("✦");
+    console.log(`  ${bullet} ${chalk.bold(m.id)}${m.name && m.name !== m.id ? chalk.dim(`  (${m.name})`) : ""}`);
   }
   console.log();
-  ui.dim(`Local: ${provider.isLocal ? "yes (offline capable)" : "no (cloud)"}`);
+  console.log(chalk.dim(`  ── ${provider.isLocal ? "🖥  Local (offline capable)" : "☁  Cloud (requires internet)"}`));
 }

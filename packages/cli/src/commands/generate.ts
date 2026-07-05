@@ -49,13 +49,17 @@ export async function generateCommand(opts: GenerateOptions): Promise<void> {
     process.exit(1);
   }
 
-  ui.dim(`Using project: ${projectRoot}`);
+  console.log(chalk.hex("#00d4ff")("\n╭──────────────────────────────────────────────╮"));
+  console.log(chalk.hex("#00d4ff")("│") + chalk.bold.white("           🎯 AI Test Generator             ") + chalk.hex("#00d4ff")(" │"));
+  console.log(chalk.hex("#00d4ff")("╰──────────────────────────────────────────────╯"));
+  console.log(chalk.hex("#48dbfb")("  Project: ") + chalk.dim(projectRoot));
   if (opts.guide) {
-    ui.dim(`Using structure guide: ${opts.guide}`);
+    console.log(chalk.hex("#feca57")("  Guide: ") + chalk.dim(opts.guide));
   }
   if (opts.tier) {
-    ui.dim(`Test tier: ${opts.tier}`);
+    console.log(chalk.hex("#ff9ff3")("  Tier: ") + chalk.dim(opts.tier));
   }
+  console.log();
 
   const baseOptions = { projectRoot, guide: opts.guide, tier: opts.tier };
 
@@ -83,23 +87,24 @@ export async function generateCommand(opts: GenerateOptions): Promise<void> {
     const res = await withSpinner("Generating BDD feature + steps…", () =>
       generateBdd(goal, baseOptions),
     );
-    ui.success(`${SUCCESS_LABEL.bdd} created:`);
-    for (const p of res.paths) console.log(chalk.green("  ✔ ") + chalk.dim(p));
+    console.log(chalk.green("  ✔ ") + chalk.bold(`${SUCCESS_LABEL.bdd} created:`));
+    for (const p of res.paths) console.log(chalk.green("    ✔ ") + chalk.dim(p));
     console.log();
     if (process.stdout.isTTY) {
-      console.log(chalk.dim("---- preview ----"));
+      console.log(chalk.hex("#48dbfb")("  ── preview ──"));
       console.log(res.content.split("\n").slice(0, 40).join("\n"));
-      console.log(chalk.dim("---- /preview ----\n"));
+      console.log(chalk.hex("#48dbfb")("  ── /preview ──\n"));
     }
   }
 }
 
 function printSingle(path: string, content: string, label: string): void {
-  ui.success(`${label} created: ${chalk.underline(path)}`);
+  console.log(chalk.green("  ✔ ") + chalk.bold(label) + chalk.dim(" created"));
+  console.log(chalk.underline(`    ${path}`));
   console.log();
   if (process.stdout.isTTY) {
-    console.log(chalk.dim("---- preview ----"));
+    console.log(chalk.hex("#48dbfb")("  ── preview ──"));
     console.log(content.split("\n").slice(0, 40).join("\n"));
-    console.log(chalk.dim("---- /preview ----\n"));
+    console.log(chalk.hex("#48dbfb")("  ── /preview ──\n"));
   }
 }

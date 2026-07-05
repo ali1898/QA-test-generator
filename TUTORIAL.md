@@ -23,6 +23,7 @@ using LLM providers (local + cloud).
 - [Commands](#commands)
   - [`qa new` — Scaffold a Project](#qa-new--scaffold-a-project)
   - [`qa generate` — Generate Tests with AI](#qa-generate--generate-tests-with-ai)
+  - [`qa generate-guide` — Create Structure Guides](#qa-generate-guide--create-structure-guides)
   - [`qa chat` — Interactive QA Assistant](#qa-chat--interactive-qa-assistant)
   - [`qa docs` — Generate Documentation](#qa-docs--generate-documentation)
   - [`qa config` — Manage Providers](#qa-config--manage-providers)
@@ -60,21 +61,27 @@ qa --help
 ## Quick Start
 
 ```bash
-# 1. Configure an LLM provider (required before generating anything)
+# 1. Configure an LLM provider
 qa config
 
-# 2. List available models to verify connectivity
+# 2. Verify connectivity
 qa models
 
-# 3. Scaffold a new Cypress project
+# 3. Scaffold a Cypress project
 qa new -n my-ecommerce-tests
 
-# 4. Generate a test
+# 4. Generate tests with AI
 cd my-ecommerce-tests
 qa generate test -g "verify user can add items to cart and checkout"
+qa generate test -g "search with filters" --tier regression
 
-# 5. Chat with the QA assistant
+# 5. Learn from existing projects
+qa generate-guide -p ./my-ecommerce-tests -o ./guides/my-guide.md
+qa generate test --goal "search products" --guide ./guides/my-guide.md
+
+# 6. Chat with the QA assistant
 qa chat
+qa chat --guide ./guides/my-guide.md
 ```
 
 ---
@@ -225,13 +232,89 @@ qa generate bdd -g "user search with filters and sorting"
 |---|---|
 | `-g, --goal` | Natural-language description (can also be prompted) |
 | `-p, --project-root` | Project root (default: current directory) |
+| `--guide` | Path to a Structure Guide markdown file for project conventions |
+| `--tier` | Test tier: `smoke` (default) or `regression` |
 | `-y, --yes` | Skip confirmations |
+
+**Using Structure Guides:**
+
+```bash
+# 1. Create a guide from an existing project
+qa generate-guide -p ./my-big-project -o ./guides/project-guide.md
+
+# 2. Generate code that follows that project's conventions
+qa generate test --goal "user login" --guide ./guides/project-guide.md
+qa generate page --goal "dashboard" --guide ./guides/project-guide.md
+qa generate locators --goal "header and sidebar" --guide ./guides/project-guide.md
+```
+
+The guide captures naming conventions (e.g. `{Pascal}Locators.ts`, `{camel}Helper.helper.ts`),
+directory layout, custom Cypress commands, and coding patterns — so generated code
+blends right in.
+
+**Test Tiers:**
+
+Use `--tier` to place generated tests in the right suite:
+
+```bash
+qa generate test -g "quick health check" --tier smoke
+qa generate test -g "full user registration flow" --tier regression
+```
 
 **Tips:**
 - Be specific in your goals: "verify user can reset password with email validation"
   produces better results than "test login"
 - The generator knows POM (Page Object Model), BDD, and Cypress best practices
 - Output is written directly into your project — review and adjust as needed
+
+---
+
+### `qa generate-guide` — Create Structure Guides
+
+Analyzes an existing Cypress project and generates a **Structure Guide** markdown
+file that captures the project's conventions — directory layout, naming patterns,
+custom commands, and coding style. Use it to make AI-generated code match your
+existing project.
+
+```bash
+# Basic: analyze the current directory
+qa generate-guide
+
+# Specify project root and output path
+qa generate-guide -p ./my-project -o ./guides/my-guide.md
+
+# Override the detected project name
+qa generate-guide -p ./my-project -o ./guides/my-guide.md -t "My Custom Project"
+```
+
+**Options:**
+
+| Flag | Description |
+|---|---|
+| `-p, --project-root` | Project root to analyze (default: current directory) |
+| `-o, --output` | Output file path (default: `./structure-guide.md`) |
+| `-t, --title` | Override detected project name |
+
+**What the guide captures:**
+
+| Aspect | Example |
+|---|---|
+| **Directory tree** | Full file listing with folder hierarchy |
+| **Naming conventions** | `{Pascal}Locators.ts`, `{camel}Helper.helper.ts`, etc. |
+| **Custom Cypress commands** | All `Cypress.Commands.add(...)` calls |
+| **Coding patterns** | class-based vs functional style, imports/exports |
+| **Output paths** | Where each artifact type belongs |
+
+**Using the guide with other commands:**
+
+```bash
+# Generate code that follows the guide's conventions
+qa generate test -g "login test" --guide ./guides/my-guide.md
+qa generate page -g "profile page" --guide ./guides/my-guide.md
+
+# Chat with project context
+qa chat --guide ./guides/my-guide.md
+```
 
 ---
 
@@ -243,6 +326,15 @@ responses (tokens appear as they're generated).
 ```bash
 qa chat
 ```
+
+**Options:**
+
+| Flag | Description |
+|---|---|
+| `--guide` | Path to a Structure Guide markdown file to use as context |
+
+When a `--guide` is provided, the assistant understands your project's conventions
+and can give more contextually accurate advice.
 
 **Slash commands:**
 
@@ -521,6 +613,33 @@ These settings affect generation quality:
   test files, decrease for simple helpers.
 
 Edit these directly in `~/.qa-test-gen/config.json`.
+
+### "How do I use an existing project's conventions?"
+
+Create a Structure Guide from your project, then use `--guide` when generating:
+
+```bash
+qa generate-guide -p ./my-project -o ./guides/my-guide.md
+qa generate test -g "new feature test" --guide ./guides/my-guide.md
+qa chat --guide ./guides/my-guide.md
+```
+
+The guide tells the AI about your naming conventions, folder structure, custom
+commands, and coding patterns — so generated code blends right in.
+
+### "What's the difference between smoke and regression tests?"
+
+- **Smoke tests** (`--tier smoke`, default): quick sanity checks that verify
+  critical paths work. Fast to run, covering happy paths only.
+- **Regression tests** (`--tier regression`): comprehensive tests covering edge
+  cases, error states, and detailed scenarios.
+
+Use `--tier` when generating to place tests in the right folder:
+
+```bash
+qa generate test -g "quick login check" --tier smoke
+qa generate test -g "login with invalid credentials" --tier regression
+```
 
 ### Output seems wrong or low quality
 

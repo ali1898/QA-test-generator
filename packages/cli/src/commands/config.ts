@@ -47,9 +47,10 @@ const SUGGESTED_MODELS: Partial<Record<ProviderId, string[]>> = {
 
 export async function configCommand(): Promise<void> {
   const config = loadConfig();
-  ui.header("LLM Configuration");
-  ui.dim(`Config file: ~/.qa-test-gen/config.json`);
-  console.log();
+  console.log(chalk.hex("#00d4ff")("\n╭──────────────────────────────────────────────╮"));
+  console.log(chalk.hex("#00d4ff")("│") + chalk.bold.white("          ⚙️  LLM Configuration             ") + chalk.hex("#00d4ff")(" │"));
+  console.log(chalk.hex("#00d4ff")("╰──────────────────────────────────────────────╯"));
+  console.log(chalk.dim("  Config file: ~/.qa-test-gen/config.json\n"));
 
   const action = await select<"add" | "switch" | "show" | "edit" | "reset">({
     message: "What do you want to do?",
@@ -140,15 +141,17 @@ export async function configCommand(): Promise<void> {
 
 /** Print the current config with secrets masked. */
 export function printConfig(config: AppConfig): void {
-  ui.header("Current Configuration");
-  console.log(`Active provider: ${chalk.bold(config.activeProvider)}`);
-  console.log(`Temperature: ${config.temperature}  Max tokens: ${config.maxTokens}\n`);
+  console.log(chalk.hex("#00d4ff")("\n╭──────────────────────────────────────────────╮"));
+  console.log(chalk.hex("#00d4ff")("│") + chalk.bold.white("          📋 Current Configuration          ") + chalk.hex("#00d4ff")(" │"));
+  console.log(chalk.hex("#00d4ff")("╰──────────────────────────────────────────────╯"));
+  console.log(chalk.hex("#48dbfb")("  Active provider: ") + chalk.bold(config.activeProvider));
+  console.log(chalk.dim(`  Temperature: ${config.temperature}  ·  Max tokens: ${config.maxTokens}\n`));
   for (const [id, entry] of Object.entries(config.providers)) {
-    const active = id === config.activeProvider ? chalk.green(" ← active") : "";
-    console.log(`• ${chalk.bold(PROVIDER_LABELS[id as ProviderId] ?? id)}${active}`);
-    console.log(`    model:   ${entry.model}`);
-    if (entry.baseURL) console.log(`    baseURL: ${entry.baseURL}`);
-    console.log(`    apiKey:  ${entry.apiKey ? chalk.green("set") + ` (${entry.apiKey.slice(0, 4)}…)` : chalk.dim("not set")}`);
+    const active = id === config.activeProvider ? chalk.hex("#48dbfb")(" ◆ active") : "";
+    console.log(`  ${chalk.hex("#feca57")("●")} ${chalk.bold(PROVIDER_LABELS[id as ProviderId] ?? id)}${active}`);
+    console.log(`    ${chalk.dim("model:")}   ${entry.model}`);
+    if (entry.baseURL) console.log(`    ${chalk.dim("baseURL:")} ${entry.baseURL}`);
+    console.log(`    ${chalk.dim("apiKey:")}  ${entry.apiKey ? chalk.green("✓ set") + chalk.dim(` (${entry.apiKey.slice(0, 4)}…)`) : chalk.dim("not set")}`);
   }
 }
 

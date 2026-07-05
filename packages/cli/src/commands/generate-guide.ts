@@ -48,17 +48,18 @@ export async function generateGuideCommand(opts: GenerateGuideOptions): Promise<
     });
   });
 
-  ui.success(`Structure guide created: ${chalk.underline(outPath)}`);
+  ui.success(`Structure guide created`);
+  console.log(chalk.underline(outPath));
   console.log();
-  console.log(chalk.dim(`Project : ${guide.projectName}`));
-  console.log(chalk.dim(`Language: ${guide.language}`));
-  console.log(chalk.dim(`Layers  : ${guide.layers.length}`));
-  console.log(chalk.dim(`Commands: ${guide.customCommands.length} custom commands`));
+  console.log(chalk.hex("#48dbfb")("  Project :") + chalk.bold(` ${guide.projectName}`));
+  console.log(chalk.hex("#feca57")("  Language:") + ` ${guide.language}`);
+  console.log(chalk.hex("#ff9ff3")("  Layers  :") + ` ${guide.layers.length}`);
+  console.log(chalk.hex("#00d4ff")("  Commands:") + ` ${guide.customCommands.length} custom commands`);
   console.log();
-  console.log(chalk.cyan("Use it with:"));
-  console.log(chalk.dim(`  qa generate test --goal "..." --guide ${outPath}`));
-  console.log(chalk.dim(`  qa generate page --goal "..." --guide ${outPath}`));
-  console.log(chalk.dim(`  qa chat --guide ${outPath}`));
+  console.log(chalk.bold.hex("#feca57")("  Use it with:"));
+  console.log(chalk.dim("    qa generate test --goal \"...\" --guide ") + chalk.underline(outPath));
+  console.log(chalk.dim("    qa generate page --goal \"...\" --guide ") + chalk.underline(outPath));
+  console.log(chalk.dim("    qa chat --guide ") + chalk.underline(outPath));
   console.log();
 }
 

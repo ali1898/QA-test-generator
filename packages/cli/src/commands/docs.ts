@@ -38,7 +38,10 @@ export async function docsCommand(opts: DocsOptions): Promise<void> {
     ui.warn("No cypress.config.* found — is this a Cypress project?");
   }
 
-  ui.dim(`Analyzing: ${projectRoot}`);
+  console.log(chalk.hex("#00d4ff")("\n╭──────────────────────────────────────────────╮"));
+  console.log(chalk.hex("#00d4ff")("│") + chalk.bold.white("           📄 Documentation Generator        ") + chalk.hex("#00d4ff")(" │"));
+  console.log(chalk.hex("#00d4ff")("╰──────────────────────────────────────────────╯"));
+  console.log(chalk.hex("#48dbfb")("  Analyzing: ") + chalk.dim(projectRoot));
   const analysis = analyzeProject({ projectRoot, projectName: opts.title });
 
   const markdown = renderMarkdown(analysis);
@@ -77,8 +80,8 @@ export async function docsCommand(opts: DocsOptions): Promise<void> {
     const result = await withSpinner("Publishing to Confluence…", () =>
       publishConfluencePage(cfg, title, markdown),
     );
-    ui.success(`${result.updated ? "Updated" : "Created"} Confluence page:`);
-    console.log(chalk.underline(`  ${result.url}`));
+    console.log(chalk.green(`  ✔ ${result.updated ? "Updated" : "Created"} Confluence page:`));
+    console.log(chalk.underline(`    ${result.url}`));
   }
 
   // ── Preview to stdout when no other output ──
