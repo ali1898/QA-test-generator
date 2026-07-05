@@ -44,14 +44,28 @@ const SUCCESS_LABEL: Record<string, string> = {
   all: "All artifacts",
 };
 
+async function promptOptional(message: string): Promise<string> {
+  const value = await input({ message });
+  return value.trim();
+}
+
 export async function generateCommand(opts: GenerateOptions): Promise<void> {
   const projectRoot = opts.projectRoot ?? process.cwd();
 
-  const goal =
-    opts.goal ?? (opts.yes ? "" : await input({ message: PROMPTS[opts.type] }));
-  if (!goal.trim()) {
-    ui.error("A description is required. Pass it with --goal or answer the prompt.");
-    process.exit(1);
+  let goal = opts.goal;
+  if (goal === undefined && !opts.yes) {
+    goal = await promptOptional(PROMPTS[opts.type]);
+    if (!goal) {
+      ui.error("A description is required.");
+      process.exit(1);
+    }
+  } else if (goal === undefined) {
+    goal = "";
+  }
+
+  let url = opts.url;
+  if (opts.type === "all" && !url && !opts.yes) {
+    url = await promptOptional("Enter the page URL to analyze (e.g. 'http://localhost:3000/login'):");
   }
 
   console.log(chalk.hex("#00d4ff")("\n╭──────────────────────────────────────────────╮"));
@@ -70,7 +84,7 @@ export async function generateCommand(opts: GenerateOptions): Promise<void> {
 
   if (opts.type === "all") {
     const res = await withSpinner("Generating all artifacts (locators + page + test)…", () =>
-      generateAll(goal, { ...baseOptions, url: opts.url }),
+      generateAll(goal, { ...baseOptions, url }),
     );
     console.log(chalk.green("  ✔ ") + chalk.bold(`${SUCCESS_LABEL.all} created:`));
     for (const p of res.paths) console.log(chalk.green("    ✔ ") + chalk.dim(p));
