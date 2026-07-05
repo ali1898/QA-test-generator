@@ -1,0 +1,61 @@
+trigger:
+  branches:
+    include:
+      - master
+      - develop
+      - feature/*
+
+pool:
+  name: QaTestAgent
+
+variables:
+  - name: NODE_VERSION
+    value: '22.x'
+
+steps:
+  - checkout: self
+
+  - task: NodeTool@0
+    inputs:
+      versionSpec: '$(NODE_VERSION)'
+    displayName: 'Install Node.js $(NODE_VERSION)'
+
+  - script: npm ci
+    displayName: 'Install npm packages'
+
+  - script: npx cypress install
+    displayName: 'Install Cypress binary'
+
+  - script: |
+      npx cypress run --browser chrome --headless
+    displayName: 'Run Cypress tests'
+    continueOnError: true
+
+  - script: |
+      npx allure generate allure-results --clean -o allure-report
+    displayName: 'Generate Allure HTML report'
+    condition: always()
+
+  - task: PublishBuildArtifacts@1
+    inputs:
+      PathtoPublish: 'allure-report'
+      ArtifactName: 'AllureReport'
+      publishLocation: 'Container'
+    displayName: 'Publish Allure report'
+    condition: always()
+
+  - task: PublishBuildArtifacts@1
+    inputs:
+      PathtoPublish: 'cypress/videos'
+      ArtifactName: 'CypressVideos'
+      publishLocation: 'Container'
+    displayName: 'Publish test videos'
+    condition: always()
+
+  - task: PublishBuildArtifacts@1
+    inputs:
+      PathtoPublish: 'cypress/screenshots'
+      ArtifactName: 'CypressScreenshots'
+      publishLocation: 'Container'
+    displayName: 'Publish screenshots'
+    condition: failed()

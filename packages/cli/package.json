@@ -1,0 +1,26 @@
+{
+  "name": "@qa-test-generator/cli",
+  "version": "0.1.0",
+  "description": "Command-line interface for the QA Test Generator",
+  "bin": {
+    "qa": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "dev": "tsc -b --watch",
+    "start": "node dist/index.js",
+    "clean": "rimraf dist *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@qa-test-generator/core": "^0.1.0",
+    "@inquirer/prompts": "^5.5.0",
+    "chalk": "^4.1.2",
+    "commander": "^12.1.0",
+    "ora": "^5.4.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.12",
+    "rimraf": "^5.0.5",
+    "typescript": "^5.4.5"
+  }
+}

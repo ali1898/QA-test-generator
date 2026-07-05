@@ -1,0 +1,21 @@
+{
+  "name": "@qa-test-generator/core",
+  "version": "0.1.0",
+  "description": "Core engine: LLM abstraction, project scaffolding, chat, docs",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "dev": "tsc -b --watch",
+    "clean": "rimraf dist *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@google/generative-ai": "0.21.0",
+    "zod": "~3.23.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.12",
+    "rimraf": "^5.0.5",
+    "typescript": "^5.4.5"
+  }
+}

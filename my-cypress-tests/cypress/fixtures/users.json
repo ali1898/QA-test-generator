@@ -1,0 +1,20 @@
+{
+  "admin": {
+    "username": "admin",
+    "password": "123456",
+    "fullName": "Admin User",
+    "role": "admin"
+  },
+  "operator": {
+    "username": "operator",
+    "password": "123456",
+    "fullName": "Operator",
+    "role": "operator"
+  },
+  "manager": {
+    "username": "manager",
+    "password": "123456",
+    "fullName": "Manager",
+    "role": "manager"
+  }
+}

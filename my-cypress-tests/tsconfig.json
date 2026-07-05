@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "paths": {
+      "cypress/*": ["./cypress/*"],
+      "@fixtures/*": ["./cypress/fixtures/*"],
+      "@support/*": ["./cypress/support/*"]
+    },
+    "module": "nodenext",
+    "target": "esnext",
+    "types": ["cypress", "node"],
+    "lib": ["dom", "esnext"],
+    "sourceMap": true,
+    "declaration": true,
+    "declarationMap": true,
+    "strict": true,
+    "jsx": "react-jsx",
+    "verbatimModuleSyntax": false,
+    "isolatedModules": true,
+    "noUncheckedSideEffectImports": true,
+    "moduleDetection": "force",
+    "skipLibCheck": true
+  },
+  "include": [
+    "cypress/support/**/*.d.ts",
+    "cypress/support/**/*.ts",
+    "cypress/**/*.ts",
+    "./**/*.ts",
+  ],
+  "exclude": ["node_modules"]
+}
