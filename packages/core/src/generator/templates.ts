@@ -1026,92 +1026,105 @@ const ask = (q) => new Promise((r) => rl.question(q, (a) => r(a.toLowerCase().tr
 function run(cmd, opts = {}) {
   try {
     return execSync(cmd, { encoding: "utf-8", stdio: ["pipe", opts.silent ? "pipe" : "inherit", "pipe"], ...opts });
-  } catch {
+  } catch (e) {
     return "";
   }
 }
 
-function version(cmd) {
+function getVersion(cmd) {
   try {
     return execSync(cmd, { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] }).trim().split(/\\r?\\n/)[0];
-  } catch {
+  } catch (e) {
     return null;
   }
 }
 
-console.log("");
-console.log("  ╔══════════════════════════════════════════════════╗");
-console.log("  ║        QA Test Generator — Dependency Setup     ║");
-console.log("  ╚══════════════════════════════════════════════════╝");
-console.log("");
-
-const deps = [];
-
-// ─── Node.js ────────────────────────────────────────────────
-const nodeVer = process.version;
-const nodeMajor = parseInt(nodeVer.slice(1).split(".")[0], 10);
-if (nodeMajor >= 18) {
-  console.log("  \\u2713  Node.js " + nodeVer);
-} else {
-  console.log("  \\u2717  Node.js " + nodeVer + " (need >= 18)");
-  process.exit(1);
-}
-
-// ─── Java (for Allure) ──────────────────────────────────────
-const javaVer = version("java -version 2>&1");
-if (javaVer) {
-  console.log("  \\u2713  Java " + javaVer.split(/\\r?\\n/)[0]);
-} else {
-  console.log("  \\u2717  Java not found — required for Allure HTML reports");
-  const ans1 = os.platform() === "win32" ? "y" : "";
-  const installMsg = os.platform() === "win32"
-    ? "  Install Java? (Y/n) [will download from adoptium.net]: "
-    : "  Install Java? (y/N): ";
-  const resp = ans1 || (await ask(installMsg));
-  if (resp === "y") {
-    if (os.platform() === "win32") {
-      console.log("  Opening https://adoptium.net/temurin/releases/ ...");
-      run("start https://adoptium.net/temurin/releases/");
-      deps.push("Java (JRE 21+) — download from the link above");
-    } else if (os.platform() === "darwin") {
-      run("brew install openjdk@21");
-    } else {
-      run("sudo apt update && sudo apt install -y default-jre");
-    }
-    console.log("  \\u2713  Java installed");
-  } else {
-    deps.push("Java (JRE 21+) — run setup again or install manually");
-  }
-}
-
-// ─── Cypress binary ─────────────────────────────────────────
-const cypressVer = version("npx cypress version 2>&1");
-if (cypressVer) {
-  console.log("  \\u2713  Cypress " + cypressVer.split(/\\r?\\n/)[0]);
-} else {
-  console.log("  \\u2717  Cypress binary not installed");
-  const resp = await ask("  Install Cypress binary now? (Y/n): ");
-  if (resp !== "n") {
-    run("npx cypress install");
-    console.log("  \\u2713  Cypress binary installed");
-  } else {
-    deps.push("Cypress binary — run 'npx cypress install' manually");
-  }
-}
-
-rl.close();
-
-if (deps.length > 0) {
+async function main() {
   console.log("");
-  console.log("  \\u26a0  Manual steps required:");
-  deps.forEach((d) => console.log("       - " + d));
+  console.log("  \\u2554" + "\\u2550".repeat(46) + "\\u2557");
+  console.log("  \\u2551        QA Test Generator \\u2014 Dependency Setup        \\u2551");
+  console.log("  \\u255a" + "\\u2550".repeat(46) + "\\u255d");
+  console.log("");
+
+  const deps = [];
+
+  // Node.js
+  const nodeVer = process.version;
+  const nodeMajor = parseInt(nodeVer.slice(1).split(".")[0], 10);
+  if (nodeMajor >= 18) {
+    console.log("  \\u2713  Node.js " + nodeVer);
+  } else {
+    console.log("  \\u2717  Node.js " + nodeVer + " (need >= 18)");
+    process.exit(1);
+  }
+
+  // Java (for Allure)
+  const javaVer = getVersion("java -version 2>&1");
+  if (javaVer) {
+    console.log("  \\u2713  Java " + javaVer);
+  } else {
+    console.log("  \\u2717  Java not found \\u2014 required for Allure HTML reports");
+    const ans1 = os.platform() === "win32" ? "" : "";
+    const installMsg = os.platform() === "win32"
+      ? "  Install Java? (Y/n) [will open download page]: "
+      : "  Install Java? (y/N): ";
+    const resp = ans1 || (await ask(installMsg));
+    if (resp === "y") {
+      if (os.platform() === "win32") {
+        console.log("  Opening https://adoptium.net/temurin/releases/ ...");
+        try { execSync("start https://adoptium.net/temurin/releases/"); } catch (e) {}
+        deps.push("Java (JRE 21+) \\u2014 download from the link opened in your browser");
+      } else if (os.platform() === "darwin") {
+        try { execSync("brew install openjdk@21", { stdio: "inherit" }); } catch (e) {
+          deps.push("Java (JRE 21+) \\u2014 run 'brew install openjdk@21' manually");
+        }
+      } else {
+        try { execSync("sudo apt update && sudo apt install -y default-jre", { stdio: "inherit" }); } catch (e) {
+          deps.push("Java (JRE 21+) \\u2014 run 'sudo apt install -y default-jre' manually");
+        }
+      }
+      console.log("  \\u2713  Java installed");
+    } else {
+      deps.push("Java (JRE 21+) \\u2014 run setup again or install manually");
+    }
+  }
+
+  // Cypress binary
+  const cypressVer = getVersion("npx cypress version 2>&1");
+  if (cypressVer) {
+    console.log("  \\u2713  Cypress " + cypressVer);
+  } else {
+    console.log("  \\u2717  Cypress binary not installed");
+    const resp = await ask("  Install Cypress binary now? (Y/n): ");
+    if (resp !== "n") {
+      try { execSync("npx cypress install", { stdio: "inherit" }); } catch (e) {
+        deps.push("Cypress binary \\u2014 run 'npx cypress install' manually");
+      }
+      console.log("  \\u2713  Cypress binary installed");
+    } else {
+      deps.push("Cypress binary \\u2014 run 'npx cypress install' manually");
+    }
+  }
+
+  rl.close();
+
+  if (deps.length > 0) {
+    console.log("");
+    console.log("  \\u26a0  Manual steps required:");
+    deps.forEach((d) => console.log("       - " + d));
+  }
+
+  console.log("");
+  console.log("  \\u2713  Setup complete!");
+  console.log("  \\u2192  Run 'npm run frontend' to start the sample app");
+  console.log("  \\u2192  Run 'npm run cy:smoke:all' to run tests");
+  console.log("");
 }
 
-console.log("");
-console.log("  \\u2713  Setup complete!");
-console.log("  \\u2192  Run 'npm run frontend' to start the sample app");
-console.log("  \\u2192  Run 'npm run cy:smoke:all' to run tests");
-console.log("");
+main().catch(function (err) {
+  console.error("  \\u2717  Setup failed:", err.message);
+  process.exit(1);
+});
 `;
   return { path: "scripts/setup/check-deps.js", content };
 }
