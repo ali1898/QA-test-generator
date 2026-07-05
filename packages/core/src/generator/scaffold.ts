@@ -30,6 +30,7 @@ import {
   scriptsServeReportPs1,
   scriptsSetupCheckDeps,
   smokeTest,
+  structureGuide,
   supportCommands,
   supportE2e,
   supportIndexDts,
@@ -75,6 +76,7 @@ export function collectFiles(o: ScaffoldOptions): FileSpec[] {
     azurePipelines(o),
     gitignore(o),
     readme(o),
+    structureGuide(o),
   ];
 
   if (o.bdd) {
