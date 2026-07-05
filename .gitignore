@@ -22,6 +22,7 @@ Thumbs.db
 test-output/
 my-cypress-tests/
 cypress/
+cypress.config.ts
 
 # Local config may contain API keys
 .env

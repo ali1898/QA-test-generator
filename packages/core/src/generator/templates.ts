@@ -39,6 +39,7 @@ export function packageJson(o: ScaffoldOptions): FileSpec {
   devDeps["concurrently"] = "^10.0.3";
 
   const scripts: Record<string, string> = {
+    "setup": "node scripts/setup/check-deps.js",
     "frontend:start": "node frontend/server.js",
     "frontend": "node frontend/server.js",
     "cy:open": "cypress open",
@@ -214,9 +215,71 @@ export function supportE2e(o: ScaffoldOptions): FileSpec {
   const content = isTs(o)
     ? `import "./commands";
 import '@shelex/cypress-allure-plugin';
+import { resetApiEntries, addApiEntry, getApiEntries } from "./commands";
+
+beforeEach(() => {
+  resetApiEntries();
+  cy.intercept(/\\/api\\//, (req) => {
+    req.continue((res) => {
+      addApiEntry({
+        method: req.method,
+        url: req.url,
+        requestBody: req.body,
+        responseBody: res.body,
+        statusCode: res.statusCode,
+        duration: res.duration,
+        timestamp: new Date().toISOString(),
+      });
+    });
+  });
+});
+
+afterEach(function () {
+  if (this.currentTest?.state === "failed") {
+    const entries = getApiEntries();
+    if (entries.length > 0) {
+      cy.allure().attachment(
+        "API Calls (before failure)",
+        JSON.stringify(entries, null, 2),
+        "application/json"
+      );
+    }
+  }
+});
 `
     : `require("./commands");
 require("@shelex/cypress-allure-plugin");
+const { resetApiEntries, addApiEntry, getApiEntries } = require("./commands");
+
+beforeEach(() => {
+  resetApiEntries();
+  cy.intercept(/\\/api\\//, (req) => {
+    req.continue((res) => {
+      addApiEntry({
+        method: req.method,
+        url: req.url,
+        requestBody: req.body,
+        responseBody: res.body,
+        statusCode: res.statusCode,
+        duration: res.duration,
+        timestamp: new Date().toISOString(),
+      });
+    });
+  });
+});
+
+afterEach(function () {
+  if (this.currentTest?.state === "failed") {
+    const entries = getApiEntries();
+    if (entries.length > 0) {
+      cy.allure().attachment(
+        "API Calls (before failure)",
+        JSON.stringify(entries, null, 2),
+        "application/json"
+      );
+    }
+  }
+});
 `;
   return { path: `cypress/support/e2e.${e}`, content };
 }
@@ -225,6 +288,30 @@ export function supportCommands(o: ScaffoldOptions): FileSpec {
   const e = ext(o);
   if (isTs(o)) {
     const content = `/// <reference types="cypress" />
+
+export interface ApiEntry {
+  method: string;
+  url: string;
+  requestBody: unknown;
+  responseBody: unknown;
+  statusCode: number;
+  duration: number;
+  timestamp: string;
+}
+
+const apiEntries: ApiEntry[] = [];
+
+export function resetApiEntries(): void {
+  apiEntries.length = 0;
+}
+
+export function addApiEntry(entry: ApiEntry): void {
+  apiEntries.push(entry);
+}
+
+export function getApiEntries(): ApiEntry[] {
+  return [...apiEntries];
+}
 
 Cypress.Commands.add("uploadFile", (selector: string, filePath: string) => {
   cy.get(selector).selectFile(filePath, { force: true });
@@ -257,7 +344,23 @@ Cypress.Commands.add("loginByApi", (username: string, password: string) => {
 `;
     return { path: `cypress/support/commands.${e}`, content };
   } else {
-    const content = `Cypress.Commands.add("uploadFile", (selector, filePath) => {
+    const content = `const apiEntries = [];
+
+function resetApiEntries() {
+  apiEntries.length = 0;
+}
+
+function addApiEntry(entry) {
+  apiEntries.push(entry);
+}
+
+function getApiEntries() {
+  return [...apiEntries];
+}
+
+module.exports = { resetApiEntries, addApiEntry, getApiEntries };
+
+Cypress.Commands.add("uploadFile", (selector, filePath) => {
   cy.get(selector).selectFile(filePath, { force: true });
 });
 
@@ -588,11 +691,12 @@ const FRONTEND_DIR = __dirname;
 
 const MIME_TYPES = {
   ".html": "text/html; charset=utf-8",
-  ".css":  "text/css; charset=utf-8",
-  ".js":   "application/javascript; charset=utf-8",
+  ".js": "application/javascript; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
   ".json": "application/json; charset=utf-8",
-  ".png":  "image/png",
-  ".ico":  "image/x-icon",
+  ".png": "image/png",
+  ".svg": "image/svg+xml",
+  ".ico": "image/x-icon",
 };
 
 function loadUsers() {
@@ -908,6 +1012,108 @@ process.on("SIGINT", () => { server.kill("SIGINT"); process.exit(0); });
 process.on("SIGTERM", () => { server.kill("SIGTERM"); process.exit(0); });
 `;
   return { path: "scripts/start-frontend.js", content };
+}
+
+export function scriptsSetupCheckDeps(_o: ScaffoldOptions): FileSpec {
+  const content = `#!/usr/bin/env node
+const { execSync } = require("child_process");
+const readline = require("readline");
+const os = require("os");
+
+const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+const ask = (q) => new Promise((r) => rl.question(q, (a) => r(a.toLowerCase().trim())));
+
+function run(cmd, opts = {}) {
+  try {
+    return execSync(cmd, { encoding: "utf-8", stdio: ["pipe", opts.silent ? "pipe" : "inherit", "pipe"], ...opts });
+  } catch {
+    return "";
+  }
+}
+
+function version(cmd) {
+  try {
+    return execSync(cmd, { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] }).trim().split(/\\r?\\n/)[0];
+  } catch {
+    return null;
+  }
+}
+
+console.log("");
+console.log("  ╔══════════════════════════════════════════════════╗");
+console.log("  ║        QA Test Generator — Dependency Setup     ║");
+console.log("  ╚══════════════════════════════════════════════════╝");
+console.log("");
+
+const deps = [];
+
+// ─── Node.js ────────────────────────────────────────────────
+const nodeVer = process.version;
+const nodeMajor = parseInt(nodeVer.slice(1).split(".")[0], 10);
+if (nodeMajor >= 18) {
+  console.log("  \\u2713  Node.js " + nodeVer);
+} else {
+  console.log("  \\u2717  Node.js " + nodeVer + " (need >= 18)");
+  process.exit(1);
+}
+
+// ─── Java (for Allure) ──────────────────────────────────────
+const javaVer = version("java -version 2>&1");
+if (javaVer) {
+  console.log("  \\u2713  Java " + javaVer.split(/\\r?\\n/)[0]);
+} else {
+  console.log("  \\u2717  Java not found — required for Allure HTML reports");
+  const ans1 = os.platform() === "win32" ? "y" : "";
+  const installMsg = os.platform() === "win32"
+    ? "  Install Java? (Y/n) [will download from adoptium.net]: "
+    : "  Install Java? (y/N): ";
+  const resp = ans1 || (await ask(installMsg));
+  if (resp === "y") {
+    if (os.platform() === "win32") {
+      console.log("  Opening https://adoptium.net/temurin/releases/ ...");
+      run("start https://adoptium.net/temurin/releases/");
+      deps.push("Java (JRE 21+) — download from the link above");
+    } else if (os.platform() === "darwin") {
+      run("brew install openjdk@21");
+    } else {
+      run("sudo apt update && sudo apt install -y default-jre");
+    }
+    console.log("  \\u2713  Java installed");
+  } else {
+    deps.push("Java (JRE 21+) — run setup again or install manually");
+  }
+}
+
+// ─── Cypress binary ─────────────────────────────────────────
+const cypressVer = version("npx cypress version 2>&1");
+if (cypressVer) {
+  console.log("  \\u2713  Cypress " + cypressVer.split(/\\r?\\n/)[0]);
+} else {
+  console.log("  \\u2717  Cypress binary not installed");
+  const resp = await ask("  Install Cypress binary now? (Y/n): ");
+  if (resp !== "n") {
+    run("npx cypress install");
+    console.log("  \\u2713  Cypress binary installed");
+  } else {
+    deps.push("Cypress binary — run 'npx cypress install' manually");
+  }
+}
+
+rl.close();
+
+if (deps.length > 0) {
+  console.log("");
+  console.log("  \\u26a0  Manual steps required:");
+  deps.forEach((d) => console.log("       - " + d));
+}
+
+console.log("");
+console.log("  \\u2713  Setup complete!");
+console.log("  \\u2192  Run 'npm run frontend' to start the sample app");
+console.log("  \\u2192  Run 'npm run cy:smoke:all' to run tests");
+console.log("");
+`;
+  return { path: "scripts/setup/check-deps.js", content };
 }
 
 export function smokeTest(o: ScaffoldOptions): FileSpec {
@@ -1456,20 +1662,23 @@ const PORT = process.env.PORT || 8080;
 const REPORT_PATH = path.resolve(process.argv[2] || ".");
 
 const MIME_MAP = {
-  ".html": "text/html",
-  ".js": "application/javascript",
-  ".css": "text/css",
-  ".json": "application/json",
+  ".html": "text/html; charset=utf-8",
+  ".js": "application/javascript; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
   ".png": "image/png",
   ".svg": "image/svg+xml",
   ".ico": "image/x-icon",
+  ".woff": "font/woff",
+  ".woff2": "font/woff2",
+  ".map": "application/json",
 };
 
 const server = http.createServer((req, res) => {
   let reqPath = req.url.split("?")[0];
   if (reqPath === "/") reqPath = "/index.html";
 
-  const safePath = path.normalize(reqPath).replace(/^(\\.\\.(\\/|\\\\|$))+/, "");
+  const safePath = path.normalize(reqPath).replace(/^\\.\\.(\\/|\\\\|$)/, "");
   const filePath = path.join(REPORT_PATH, safePath);
 
   if (!filePath.startsWith(REPORT_PATH)) {
@@ -1488,11 +1697,17 @@ const server = http.createServer((req, res) => {
 });
 
 function serveFile(filePath, res) {
-  const ext = path.extname(filePath).toLowerCase();
-  const contentType = MIME_MAP[ext] || "application/octet-stream";
-  const content = fs.readFileSync(filePath);
-  res.writeHead(200, { "Content-Type": contentType });
-  res.end(content);
+  try {
+    const ext = path.extname(filePath).toLowerCase();
+    const contentType = MIME_MAP[ext] || "application/octet-stream";
+    const content = fs.readFileSync(filePath);
+    res.writeHead(200, { "Content-Type": contentType });
+    res.end(content);
+  } catch (err) {
+    console.error("Error serving", filePath, err.message);
+    res.writeHead(500);
+    res.end("Internal Server Error");
+  }
 }
 
 server.listen(PORT, () => {
@@ -1756,7 +1971,10 @@ export function readme(o: ScaffoldOptions): FileSpec {
     "## Quick Start",
     "",
     "```bash",
-    "# 1. Install dependencies",
+    "# 0. Check & install dependencies (Node.js >= 18, Java for Allure, Cypress binary)",
+    "npm run setup",
+    "",
+    "# 1. Install npm packages",
     "npm install",
     "",
     "# 2. Start the sample frontend app (terminal 1)",
@@ -1841,6 +2059,7 @@ export function readme(o: ScaffoldOptions): FileSpec {
     "",
     "| Command | Description |",
     "|---------|-------------|",
+    "| `npm run setup` | Check & install required deps (Node.js, Java, Cypress binary) |",
     "| `npm run cy:open` | Open Cypress Test Runner (interactive UI) |",
     "| `npm run cy:run` | Run all specs headless |",
     "| `npm run test` | Alias: run smoke tests only |",
@@ -1884,7 +2103,8 @@ export function readme(o: ScaffoldOptions): FileSpec {
     "npx qa new --name my-tests --language typescript --bdd --allure --yes",
     "cd my-tests",
     "",
-    "# 2. Install & start frontend",
+    "# 2. Check dependencies & install",
+    "npm run setup                  # Checks Node.js, Java, Cypress binary",
     "npm install",
     "npm run frontend &",
     "",
@@ -1906,6 +2126,15 @@ export function readme(o: ScaffoldOptions): FileSpec {
     "| admin | 123456 | مدیر سیستم |",
     "| operator | 123456 | اپراتور |",
     "| manager | 123456 | مدیر پروژه |",
+    "",
+    "## Platform Notes",
+    "",
+    "| Platform | `qa` command | Notes |",
+    "|----------|-------------|-------|",
+    "| Linux / macOS | `qa`, `npx qa`, `npm run qa` | All work |",
+    "| Windows | `npx qa` or `npm run qa` | Bare `qa` requires global install (`npm install -g`) |",
+    "",
+    "The `npm run setup` script detects your OS and installs the correct packages.",
   );
 
   return { path: "README.md", content: lines.join("\n") + "\n" };

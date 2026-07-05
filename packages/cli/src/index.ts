@@ -15,12 +15,21 @@ import { chatCommand } from "./commands/chat";
 import { docsCommand, type DocsOptions } from "./commands/docs";
 import { modelsCommand } from "./commands/models";
 
+const BANNER = chalk.cyan(`
+   ██████  ██     ███████     ████████ ███████ ███████ ████████
+  ██       ██        ███        ██    ██      ██         ██
+  ██   ███ ██       ███         ██    █████   ███████    ██
+  ██    ██ ██      ███          ██    ██           ██    ██
+   ██████  ██████ ███████       ██    ███████ ███████    ██
+`) + chalk.dim(`  Cypress Test Generator v${CORE_VERSION} — POM + BDD + Allure + AI`) + "\n";
+
 const program = new Command();
 
 program
   .name("qa")
   .description("Cypress test project generator with AI assistance")
   .version(CORE_VERSION)
+  .addHelpText("before", BANNER)
   .addHelpText(
     "after",
     `
@@ -48,10 +57,13 @@ Examples:
   # ——— Configuration ———
   $ qa config                                                       # Set up LLM provider keys
   $ qa models                                                       # List available AI models
+
+Note:
+  Windows users: use 'npm run qa' or 'npx qa' instead of bare 'qa'.
 `,
   )
   .hook("preAction", () => {
-    // Friendly banner before every command (except --version/--help).
+    // Reserved for future global checks.
   });
 
 // ── qa new ──────────────────────────────────────────────────────────────────

@@ -23,6 +23,13 @@ export interface NewOptions {
 }
 
 export async function newCommand(opts: NewOptions): Promise<void> {
+  console.log(chalk.cyan(`
+   ██████  ██     ███████     ████████ ███████ ███████ ████████
+  ██       ██        ███        ██    ██      ██         ██
+  ██   ███ ██       ███         ██    █████   ███████    ██
+  ██    ██ ██      ███          ██    ██           ██    ██
+   ██████  ██████ ███████       ██    ███████ ███████    ██
+`));
   ui.header("Create a Cypress project");
 
   // ── Gather inputs (skip prompts when --yes and a value is provided) ──
@@ -98,8 +105,11 @@ export async function newCommand(opts: NewOptions): Promise<void> {
   console.log();
   console.log(chalk.bold("Next steps:"));
   console.log(chalk.dim("  cd ") + resolve(targetDir));
-  console.log(chalk.dim("  ") + (bdd ? "npx cypress open   # run the sample feature" : "npx cypress open"));
-  console.log(chalk.dim("  npm test"));
+  console.log(chalk.dim("  npm run setup        # Check & install deps (Node, Java, Cypress)"));
+  console.log(chalk.dim("  npm run frontend      # Start the sample app on :3000"));
+  console.log(chalk.dim("  ") + (bdd ? "npx cypress open   # Run the sample feature" : "npx cypress open"));
+  console.log(chalk.dim("  npm test             # Run smoke tests"));
   console.log();
+  console.log(chalk.dim("  Tip: on Windows, use 'npx qa' or 'npm run qa' instead of bare 'qa'."));
   ui.dim(`Tip: run ${chalk.bold('"qa generate test"')} inside the project to add more tests.`);
 }
