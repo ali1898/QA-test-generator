@@ -20,6 +20,8 @@ Thumbs.db
 
 # Generated test projects (local testing)
 test-output/
+my-cypress-tests/
+cypress/
 
 # Local config may contain API keys
 .env

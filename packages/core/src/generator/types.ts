@@ -20,7 +20,7 @@ export const scaffoldOptionsSchema = z.object({
   /** Include Allure reporter plugin. */
   allure: z.boolean().default(true),
   /** Base URL the generated tests will target. */
-  baseUrl: z.string().default("https://example.cypress.io"),
+  baseUrl: z.string().default("http://localhost:3000"),
   /** Run `npm install` after scaffolding. */
   installDeps: z.boolean().default(true),
 });

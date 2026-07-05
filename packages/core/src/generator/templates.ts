@@ -35,9 +35,6 @@ export function packageJson(o: ScaffoldOptions): FileSpec {
     devDeps["allure-commandline"] = "^2.43.0";
   }
 
-  devDeps["@cypress/xpath"] = "^2.0.3";
-  devDeps["@testing-library/cypress"] = "^10.1.0";
-  devDeps["cypress-terminal-report"] = "^7.3.3";
   devDeps["rimraf"] = "^6.1.3";
   devDeps["concurrently"] = "^10.0.3";
 
@@ -92,6 +89,11 @@ export function packageJson(o: ScaffoldOptions): FileSpec {
       stepDefinitions: "cypress/e2e/step-definitions/**/*.ts",
     };
   }
+
+  pkg.overrides = {
+    uuid: "^11",
+    glob: "^13",
+  };
 
   return { path: "package.json", content: JSON.stringify(pkg, null, 2) + "\n" };
 }
@@ -211,16 +213,10 @@ export function supportE2e(o: ScaffoldOptions): FileSpec {
   const e = ext(o);
   const content = isTs(o)
     ? `import "./commands";
-import '@cypress/xpath';
 import '@shelex/cypress-allure-plugin';
-import "cypress-plugin-steps";
-import "@testing-library/cypress/add-commands";
 `
     : `require("./commands");
-require("@cypress/xpath");
 require("@shelex/cypress-allure-plugin");
-require("cypress-plugin-steps");
-require("@testing-library/cypress/add-commands");
 `;
   return { path: `cypress/support/e2e.${e}`, content };
 }
@@ -337,45 +333,46 @@ export interface UsersData {
 export function locators(o: ScaffoldOptions): FileSpec {
   const e = ext(o);
   if (isTs(o)) {
-    const content = `export const LOCATORS = {
-  LOGIN_PAGE: {
-    Username_Input: "[formcontrolname='username']",
-    Password_Input: "[formcontrolname='password']",
-    Login_Button: "login",
-  },
-  Sidebar: {
-    Siam_Service: "checkRunService",
-    Announcements: "notifications",
-    Change_Theme: "toggleTheme",
-    Login_As: "showImpersonateDlg",
-    Logout: "stopImpersonate",
-    Yes_Button: "onOkClick",
-    No_Button: "onNoClick",
-  },
-} as const;
-
-export type Locators = typeof LOCATORS;
+    const content = `/**
+ * Locators for the sample frontend app
+ * =====================================
+ *
+ * All selectors use data-cy attributes (best practice in Cypress).
+ * If the DOM changes, update only this file.
+ */
+export const LoginLocators = {
+  loginForm:        (): Cypress.Chainable<JQuery<HTMLElement>> => cy.getByCy("login-form"),
+  usernameInput:    (): Cypress.Chainable<JQuery<HTMLElement>> => cy.getByCy("username-input"),
+  passwordInput:    (): Cypress.Chainable<JQuery<HTMLElement>> => cy.getByCy("password-input"),
+  loginButton:      (): Cypress.Chainable<JQuery<HTMLElement>> => cy.getByCy("login-button"),
+  errorMessage:     (): Cypress.Chainable<JQuery<HTMLElement>> => cy.getByCy("login-error"),
+  welcomeTitle:     (): Cypress.Chainable<JQuery<HTMLElement>> => cy.getByCy("welcome-title"),
+  welcomeSubtitle:  (): Cypress.Chainable<JQuery<HTMLElement>> => cy.getByCy("welcome-subtitle"),
+  userFullname:     (): Cypress.Chainable<JQuery<HTMLElement>> => cy.getByCy("user-fullname"),
+  userRole:         (): Cypress.Chainable<JQuery<HTMLElement>> => cy.getByCy("user-role"),
+  successBadge:     (): Cypress.Chainable<JQuery<HTMLElement>> => cy.getByCy("success-badge"),
+  navbar:           (): Cypress.Chainable<JQuery<HTMLElement>> => cy.getByCy("navbar"),
+  logoutButton:     (): Cypress.Chainable<JQuery<HTMLElement>> => cy.getByCy("logout-button"),
+};
 `;
     return { path: `cypress/e2e/locators/locators.${e}`, content };
   } else {
-    const content = `export const LOCATORS = {
-  LOGIN_PAGE: {
-    Username_Input: "[formcontrolname='username']",
-    Password_Input: "[formcontrolname='password']",
-    Login_Button: "login",
-  },
-  Sidebar: {
-    Siam_Service: "checkRunService",
-    Announcements: "notifications",
-    Change_Theme: "toggleTheme",
-    Login_As: "showImpersonateDlg",
-    Logout: "stopImpersonate",
-    Yes_Button: "onOkClick",
-    No_Button: "onNoClick",
-  },
+    const content = `export const LoginLocators = {
+  loginForm:        () => cy.getByCy("login-form"),
+  usernameInput:    () => cy.getByCy("username-input"),
+  passwordInput:    () => cy.getByCy("password-input"),
+  loginButton:      () => cy.getByCy("login-button"),
+  errorMessage:     () => cy.getByCy("login-error"),
+  welcomeTitle:     () => cy.getByCy("welcome-title"),
+  welcomeSubtitle:  () => cy.getByCy("welcome-subtitle"),
+  userFullname:     () => cy.getByCy("user-fullname"),
+  userRole:         () => cy.getByCy("user-role"),
+  successBadge:     () => cy.getByCy("success-badge"),
+  navbar:           () => cy.getByCy("navbar"),
+  logoutButton:     () => cy.getByCy("logout-button"),
 };
 
-module.exports = { LOCATORS };
+module.exports = { LoginLocators };
 `;
     return { path: `cypress/e2e/locators/locators.${e}`, content };
   }
@@ -384,30 +381,60 @@ module.exports = { LOCATORS };
 export function loginPage(o: ScaffoldOptions): FileSpec {
   const e = ext(o);
   if (isTs(o)) {
-    const content = `import { LOCATORS } from "../locators/locators";
+    const content = `import { LoginLocators } from "../locators/locators";
 
 export class LoginPage {
-  openLoginPage(): Cypress.Chainable<JQuery<HTMLElement>> {
-    return cy.visit("/");
+
+  visit(): this {
+    cy.visit("/");
+    LoginLocators.loginForm().should("be.visible");
+    return this;
   }
 
-  enterUserNameInput(username: string): Cypress.Chainable<JQuery<HTMLElement>> {
-    return cy.get(LOCATORS.LOGIN_PAGE.Username_Input).type(username);
+  fillUsername(username: string): this {
+    LoginLocators.usernameInput()
+      .should("be.visible")
+      .clear()
+      .type(username);
+    return this;
   }
 
-  enterPasswordInput(password: string): Cypress.Chainable<JQuery<HTMLElement>> {
-    return cy.get(LOCATORS.LOGIN_PAGE.Password_Input).type(password);
+  fillPassword(password: string): this {
+    LoginLocators.passwordInput()
+      .should("be.visible")
+      .clear()
+      .type(password);
+    return this;
   }
 
-  clickLoginButton(): Cypress.Chainable<JQuery<HTMLElement>> {
-    return cy.getByCy(LOCATORS.LOGIN_PAGE.Login_Button).click();
+  clickLogin(): this {
+    LoginLocators.loginButton()
+      .should("be.visible")
+      .click();
+    return this;
   }
 
   login(username: string, password: string): this {
-    this.enterUserNameInput(username);
-    this.enterPasswordInput(password);
-    this.clickLoginButton();
-    return this;
+    return this
+      .fillUsername(username)
+      .fillPassword(password)
+      .clickLogin();
+  }
+
+  getErrorMessage(): Cypress.Chainable<JQuery<HTMLElement>> {
+    return LoginLocators.errorMessage();
+  }
+
+  getWelcomeTitle(): Cypress.Chainable<JQuery<HTMLElement>> {
+    return LoginLocators.welcomeTitle();
+  }
+
+  getUserFullname(): Cypress.Chainable<JQuery<HTMLElement>> {
+    return LoginLocators.userFullname();
+  }
+
+  getUserRole(): Cypress.Chainable<JQuery<HTMLElement>> {
+    return LoginLocators.userRole();
   }
 }
 
@@ -415,30 +442,60 @@ export const loginPage = new LoginPage();
 `;
     return { path: `cypress/e2e/pages/loginPage.${e}`, content };
   } else {
-    const content = `const { LOCATORS } = require("../locators/locators");
+    const content = `const { LoginLocators } = require("../locators/locators");
 
 class LoginPage {
-  openLoginPage() {
-    return cy.visit("/");
+
+  visit() {
+    cy.visit("/");
+    LoginLocators.loginForm().should("be.visible");
+    return this;
   }
 
-  enterUserNameInput(username) {
-    return cy.get(LOCATORS.LOGIN_PAGE.Username_Input).type(username);
+  fillUsername(username) {
+    LoginLocators.usernameInput()
+      .should("be.visible")
+      .clear()
+      .type(username);
+    return this;
   }
 
-  enterPasswordInput(password) {
-    return cy.get(LOCATORS.LOGIN_PAGE.Password_Input).type(password);
+  fillPassword(password) {
+    LoginLocators.passwordInput()
+      .should("be.visible")
+      .clear()
+      .type(password);
+    return this;
   }
 
-  clickLoginButton() {
-    return cy.getByCy(LOCATORS.LOGIN_PAGE.Login_Button).click();
+  clickLogin() {
+    LoginLocators.loginButton()
+      .should("be.visible")
+      .click();
+    return this;
   }
 
   login(username, password) {
-    this.enterUserNameInput(username);
-    this.enterPasswordInput(password);
-    this.clickLoginButton();
-    return this;
+    return this
+      .fillUsername(username)
+      .fillPassword(password)
+      .clickLogin();
+  }
+
+  getErrorMessage() {
+    return LoginLocators.errorMessage();
+  }
+
+  getWelcomeTitle() {
+    return LoginLocators.welcomeTitle();
+  }
+
+  getUserFullname() {
+    return LoginLocators.userFullname();
+  }
+
+  getUserRole() {
+    return LoginLocators.userRole();
   }
 }
 
@@ -521,33 +578,374 @@ module.exports = { Sidebar, sidebar };
   }
 }
 
+export function frontendServerJs(_o: ScaffoldOptions): FileSpec {
+  const content = `const http = require("http");
+const fs = require("fs");
+const path = require("path");
+
+const PORT = 3000;
+const FRONTEND_DIR = __dirname;
+
+const MIME_TYPES = {
+  ".html": "text/html; charset=utf-8",
+  ".css":  "text/css; charset=utf-8",
+  ".js":   "application/javascript; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".png":  "image/png",
+  ".ico":  "image/x-icon",
+};
+
+function loadUsers() {
+  const raw = fs.readFileSync(path.join(FRONTEND_DIR, "users.json"), "utf-8");
+  return JSON.parse(raw);
+}
+
+function serveStaticFile(res, filePath) {
+  const ext = path.extname(filePath).toLowerCase();
+  const contentType = MIME_TYPES[ext] || "application/octet-stream";
+  if (!fs.existsSync(filePath)) {
+    res.writeHead(404, { "Content-Type": "text/html; charset=utf-8" });
+    return res.end("<h1>404 – Page not found</h1>");
+  }
+  const content = fs.readFileSync(filePath, "utf-8");
+  res.writeHead(200, { "Content-Type": contentType });
+  res.end(content);
+}
+
+function handleLogin(req, res) {
+  let body = "";
+  req.on("data", (chunk) => { body += chunk; });
+  req.on("end", () => {
+    try {
+      const { username, password } = JSON.parse(body);
+      const users = loadUsers();
+      if (!username || !password) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        return res.end(JSON.stringify({ success: false, message: "نام کاربری و رمز عبور الزامی است" }));
+      }
+      const user = users[username];
+      if (!user || user.password !== password) {
+        res.writeHead(401, { "Content-Type": "application/json" });
+        return res.end(JSON.stringify({ success: false, message: "نام کاربری یا رمز عبور اشتباه است" }));
+      }
+      const token = Buffer.from(username + ":" + Date.now()).toString("base64");
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({
+        success: true, token,
+        user: { username, fullName: user.fullName, role: user.role },
+      }));
+    } catch (e) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ success: false, message: "Invalid request" }));
+    }
+  });
+}
+
+const server = http.createServer((req, res) => {
+  const { method, url } = req;
+  if (url === "/api/login" && method === "POST") return handleLogin(req, res);
+  if (url === "/dashboard.html") {
+    const cookie = req.headers.cookie || "";
+    if (!cookie.includes("token=")) {
+      res.writeHead(302, { Location: "/" });
+      return res.end();
+    }
+  }
+  let reqPath = url.split("?")[0];
+  if (reqPath === "/") reqPath = "/index.html";
+  const safePath = path.normalize(reqPath).replace(/^(\\.\\.(\\\\|\\/|$))+/, "");
+  const filePath = path.join(FRONTEND_DIR, safePath);
+  if (!filePath.startsWith(FRONTEND_DIR)) {
+    res.writeHead(403);
+    return res.end("Forbidden");
+  }
+  serveStaticFile(res, filePath);
+});
+
+server.listen(PORT, () => {
+  console.log("Frontend server running at http://localhost:" + PORT);
+  console.log("Test users: admin/123456, operator/123456, manager/123456");
+});
+`;
+  return { path: "frontend/server.js", content };
+}
+
+export function frontendUsersJson(_o: ScaffoldOptions): FileSpec {
+  const content = `{
+  "admin": {
+    "password": "123456",
+    "fullName": "مدیر سیستم",
+    "role": "admin"
+  },
+  "operator": {
+    "password": "123456",
+    "fullName": "اپراتور تست",
+    "role": "operator"
+  },
+  "manager": {
+    "password": "123456",
+    "fullName": "مدیر پروژه",
+    "role": "manager"
+  }
+}
+`;
+  return { path: "frontend/users.json", content };
+}
+
+export function frontendIndexHtml(_o: ScaffoldOptions): FileSpec {
+  const content = `<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ورود به سیستم</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    @font-face {
+      font-family: 'Vazir';
+      src: url('https://cdn.jsdelivr.net/gh/rastikerdar/vazir-font@v30.1.0/dist/Vazir.woff2') format('woff2');
+    }
+    body {
+      font-family: 'Vazir', Tahoma, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 20px;
+    }
+    .login-container {
+      background: white; border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      padding: 48px 40px; width: 100%; max-width: 420px; text-align: center;
+    }
+    .login-container h1 { color: #333; font-size: 24px; margin-bottom: 8px; }
+    .login-container p { color: #888; font-size: 14px; margin-bottom: 32px; }
+    .form-group { text-align: right; margin-bottom: 20px; }
+    .form-group label { display: block; margin-bottom: 6px; color: #555; font-size: 13px; font-weight: bold; }
+    .form-group input {
+      width: 100%; padding: 12px 16px; border: 2px solid #e1e1e1; border-radius: 8px;
+      font-family: 'Vazir', Tahoma, sans-serif; font-size: 14px; transition: border-color 0.3s; outline: none;
+    }
+    .form-group input:focus { border-color: #667eea; }
+    .form-group input.error { border-color: #e74c3c; }
+    .error-message {
+      background: #fde8e8; color: #c0392b; padding: 12px; border-radius: 8px;
+      margin-bottom: 20px; font-size: 13px; display: none;
+    }
+    .error-message.visible { display: block; }
+    button {
+      width: 100%; padding: 14px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white; border: none; border-radius: 8px;
+      font-family: 'Vazir', Tahoma, sans-serif; font-size: 16px; font-weight: bold;
+      cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;
+    }
+    button:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(102,126,234,0.4); }
+    .login-info {
+      margin-top: 24px; padding: 16px; background: #f8f9fa; border-radius: 8px;
+      font-size: 12px; color: #888; text-align: right; line-height: 2;
+    }
+    .login-info strong { color: #555; }
+    .loader { display: none; width: 20px; height: 20px; border: 3px solid #f3f3f3; border-top: 3px solid #667eea; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto; }
+    .loader.visible { display: inline-block; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <h1>به سیستم خوش آمدید</h1>
+    <p>لطفاً برای ورود اطلاعات خود را وارد کنید</p>
+    <div class="error-message" data-cy="login-error" id="errorMessage"></div>
+    <form id="loginForm" data-cy="login-form">
+      <div class="form-group">
+        <label for="username">نام کاربری</label>
+        <input type="text" id="username" data-cy="username-input" placeholder="نام کاربری خود را وارد کنید" autocomplete="username">
+      </div>
+      <div class="form-group">
+        <label for="password">رمز عبور</label>
+        <input type="password" id="password" data-cy="password-input" placeholder="رمز عبور خود را وارد کنید" autocomplete="current-password">
+      </div>
+      <button type="submit" data-cy="login-button">
+        <span id="buttonText">ورود به سیستم</span>
+        <span class="loader" id="buttonLoader"></span>
+      </button>
+    </form>
+    <div class="login-info">
+      <strong>راهنما:</strong><br>
+      🧑‍💼 مدیر سیستم: <strong>admin</strong> / <strong>123456</strong><br>
+      🧑‍💻 اپراتور: <strong>operator</strong> / <strong>123456</strong><br>
+      👨‍💼 مدیر پروژه: <strong>manager</strong> / <strong>123456</strong>
+    </div>
+  </div>
+  <script>
+    document.getElementById("loginForm").addEventListener("submit", async function(e) {
+      e.preventDefault();
+      const username = document.getElementById("username").value.trim();
+      const password = document.getElementById("password").value.trim();
+      const errorEl = document.getElementById("errorMessage");
+      const btnText = document.getElementById("buttonText");
+      const btnLoader = document.getElementById("buttonLoader");
+      const usernameInput = document.getElementById("username");
+      const passwordInput = document.getElementById("password");
+      errorEl.classList.remove("visible");
+      errorEl.textContent = "";
+      usernameInput.classList.remove("error");
+      passwordInput.classList.remove("error");
+      if (!username) { showError("لطفاً نام کاربری را وارد کنید"); usernameInput.classList.add("error"); usernameInput.focus(); return; }
+      if (!password) { showError("لطفاً رمز عبور را وارد کنید"); passwordInput.classList.add("error"); passwordInput.focus(); return; }
+      if (password.length < 4) { showError("رمز عبور باید حداقل ۴ کاراکتر باشد"); passwordInput.classList.add("error"); passwordInput.focus(); return; }
+      btnText.style.display = "none";
+      btnLoader.classList.add("visible");
+      try {
+        const response = await fetch("/api/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username, password }),
+        });
+        const data = await response.json();
+        if (data.success) {
+          document.cookie = "token=" + data.token + "; path=/; max-age=3600";
+          document.cookie = "user=" + encodeURIComponent(JSON.stringify(data.user)) + "; path=/; max-age=3600";
+          window.location.href = "/dashboard.html";
+        } else { showError(data.message); }
+      } catch (err) { showError("خطا در ارتباط با سرور"); }
+      finally { btnText.style.display = "inline"; btnLoader.classList.remove("visible"); }
+    });
+    function showError(message) { const el = document.getElementById("errorMessage"); el.textContent = message; el.classList.add("visible"); }
+  </script>
+</body>
+</html>
+`;
+  return { path: "frontend/index.html", content };
+}
+
+export function frontendDashboardHtml(_o: ScaffoldOptions): FileSpec {
+  const content = `<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>داشبورد</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    @font-face {
+      font-family: 'Vazir';
+      src: url('https://cdn.jsdelivr.net/gh/rastikerdar/vazir-font@v30.1.0/dist/Vazir.woff2') format('woff2');
+    }
+    body { font-family: 'Vazir', Tahoma, sans-serif; background: #f0f2f5; min-height: 100vh; }
+    .navbar { background: white; padding: 16px 32px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; }
+    .navbar h2 { color: #333; font-size: 18px; }
+    .navbar .user-info { display: flex; align-items: center; gap: 12px; }
+    .navbar .user-info span { color: #555; font-size: 14px; }
+    .navbar .user-info .role-badge { background: #667eea; color: white; padding: 4px 12px; border-radius: 20px; font-size: 12px; }
+    .navbar button { background: #e74c3c; color: white; border: none; padding: 8px 20px; border-radius: 6px; cursor: pointer; font-family: 'Vazir', Tahoma, sans-serif; font-size: 13px; }
+    .navbar button:hover { background: #c0392b; }
+    .container { max-width: 800px; margin: 40px auto; padding: 0 20px; }
+    .welcome-card { background: white; border-radius: 16px; padding: 40px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); text-align: center; }
+    .welcome-card h1 { color: #333; font-size: 28px; margin-bottom: 16px; }
+    .welcome-card .subtitle { color: #888; font-size: 16px; margin-bottom: 32px; }
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 32px; }
+    .stat-card { background: #f8f9fa; border-radius: 12px; padding: 24px; text-align: center; }
+    .stat-card .number { font-size: 32px; font-weight: bold; color: #667eea; }
+    .stat-card .label { color: #888; font-size: 13px; margin-top: 8px; }
+    .success-badge { display: inline-flex; align-items: center; gap: 8px; background: #d4edda; color: #155724; padding: 8px 16px; border-radius: 8px; font-size: 14px; margin-top: 24px; }
+  </style>
+</head>
+<body>
+  <nav class="navbar" data-cy="navbar">
+    <h2>سامانه تست خودکار</h2>
+    <div class="user-info">
+      <span data-cy="user-fullname" id="userFullname"></span>
+      <span class="role-badge" data-cy="user-role" id="userRole"></span>
+      <button onclick="logout()" data-cy="logout-button">خروج</button>
+    </div>
+  </nav>
+  <div class="container">
+    <div class="welcome-card">
+      <h1 data-cy="welcome-title">خوش آمدید!</h1>
+      <p class="subtitle" data-cy="welcome-subtitle">شما با موفقیت وارد سیستم شده‌اید.</p>
+      <div class="success-badge" data-cy="success-badge">✅ لاگین با موفقیت انجام شد</div>
+      <div class="stats">
+        <div class="stat-card"><div class="number">۰</div><div class="label">خطاهای امروز</div></div>
+        <div class="stat-card"><div class="number">۱۲</div><div class="label">تست‌های اجرا شده</div></div>
+        <div class="stat-card"><div class="number">۱۰۰%</div><div class="label">موفقیت</div></div>
+      </div>
+    </div>
+  </div>
+  <script>
+    function getCookie(name) {
+      const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+      return match ? decodeURIComponent(match[2]) : null;
+    }
+    const userCookie = getCookie('user');
+    if (!userCookie) { window.location.href = '/'; }
+    else {
+      const user = JSON.parse(userCookie);
+      document.getElementById('userFullname').textContent = user.fullName;
+      const r = { admin: 'مدیر سیستم', operator: 'اپراتور', manager: 'مدیر پروژه' };
+      document.getElementById('userRole').textContent = r[user.role] || user.role;
+    }
+    function logout() {
+      document.cookie = 'token=; path=/; max-age=0';
+      document.cookie = 'user=; path=/; max-age=0';
+      window.location.href = '/';
+    }
+  </script>
+</body>
+</html>
+`;
+  return { path: "frontend/dashboard.html", content };
+}
+
+export function frontendStartScript(_o: ScaffoldOptions): FileSpec {
+  const content = `#!/usr/bin/env node
+const { spawn } = require("child_process");
+const path = require("path");
+
+const serverPath = path.resolve(__dirname, "..", "frontend", "server.js");
+const server = spawn("node", [serverPath], {
+  stdio: "inherit",
+  cwd: path.resolve(__dirname, ".."),
+  shell: true,
+});
+
+process.on("SIGINT", () => { server.kill("SIGINT"); process.exit(0); });
+process.on("SIGTERM", () => { server.kill("SIGTERM"); process.exit(0); });
+`;
+  return { path: "scripts/start-frontend.js", content };
+}
+
 export function smokeTest(o: ScaffoldOptions): FileSpec {
   const e = ext(o);
   if (isTs(o)) {
     const content = `import { loginPage } from "../../pages/loginPage";
 
 describe("Login Page — Smoke Tests", { tags: ["smoke"] }, () => {
+
   beforeEach(() => {
-    loginPage.openLoginPage();
+    loginPage.visit();
   });
 
-  it("should display the login form", () => {
+  it("should display the login form elements", () => {
     cy.getByCy("login-form").should("be.visible");
+    cy.getByCy("username-input").should("be.visible");
+    cy.getByCy("password-input").should("be.visible");
+    cy.getByCy("login-button").should("be.visible");
   });
 
-  it("should show an error with empty fields", () => {
-    cy.getByCy("login-button").click();
-    cy.getByCy("login-error").should("be.visible");
+  it("should show an error when clicking login with empty fields", () => {
+    loginPage.clickLogin();
+    loginPage.getErrorMessage()
+      .should("be.visible")
+      .and("contain.text", "نام کاربری");
   });
 
-  it("should login with valid credentials", () => {
+  it("should login successfully with valid credentials (admin/123456)", () => {
     loginPage.login("admin", "123456");
-    cy.url().should("include", "/dashboard");
+    cy.url().should("include", "/dashboard.html");
+    loginPage.getWelcomeTitle().should("be.visible");
   });
 
-  it("should show error with invalid credentials", () => {
+  it("should show error message with invalid credentials", () => {
     loginPage.login("wrong", "wrong");
-    cy.getByCy("login-error").should("be.visible");
+    loginPage.getErrorMessage()
+      .should("be.visible")
+      .and("contain.text", "نام کاربری یا رمز عبور");
   });
 });
 `;
@@ -556,27 +954,36 @@ describe("Login Page — Smoke Tests", { tags: ["smoke"] }, () => {
     const content = `const { loginPage } = require("../../pages/loginPage");
 
 describe("Login Page — Smoke Tests", { tags: ["smoke"] }, () => {
+
   beforeEach(() => {
-    loginPage.openLoginPage();
+    loginPage.visit();
   });
 
-  it("should display the login form", () => {
+  it("should display the login form elements", () => {
     cy.getByCy("login-form").should("be.visible");
+    cy.getByCy("username-input").should("be.visible");
+    cy.getByCy("password-input").should("be.visible");
+    cy.getByCy("login-button").should("be.visible");
   });
 
-  it("should show an error with empty fields", () => {
-    cy.getByCy("login-button").click();
-    cy.getByCy("login-error").should("be.visible");
+  it("should show an error when clicking login with empty fields", () => {
+    loginPage.clickLogin();
+    loginPage.getErrorMessage()
+      .should("be.visible")
+      .and("contain.text", "نام کاربری");
   });
 
-  it("should login with valid credentials", () => {
+  it("should login successfully with valid credentials (admin/123456)", () => {
     loginPage.login("admin", "123456");
-    cy.url().should("include", "/dashboard");
+    cy.url().should("include", "/dashboard.html");
+    loginPage.getWelcomeTitle().should("be.visible");
   });
 
-  it("should show error with invalid credentials", () => {
+  it("should show error message with invalid credentials", () => {
     loginPage.login("wrong", "wrong");
-    cy.getByCy("login-error").should("be.visible");
+    loginPage.getErrorMessage()
+      .should("be.visible")
+      .and("contain.text", "نام کاربری یا رمز عبور");
   });
 });
 `;
@@ -590,21 +997,23 @@ export function regressionTest(o: ScaffoldOptions): FileSpec {
     const content = `import { loginPage } from "../../pages/loginPage";
 
 describe("Login Page — Regression Tests", { tags: ["regression"] }, () => {
+
   describe("Login with different users", () => {
     beforeEach(() => {
-      loginPage.openLoginPage();
+      loginPage.visit();
     });
 
     const users = [
-      { username: "admin", password: "123456", role: "مدیر سیستم" },
+      { username: "admin",    password: "123456", role: "مدیر سیستم" },
       { username: "operator", password: "123456", role: "اپراتور" },
-      { username: "manager", password: "123456", role: "مدیر پروژه" },
+      { username: "manager",  password: "123456", role: "مدیر پروژه" },
     ];
 
     users.forEach(({ username, password, role }) => {
-      it(\`user \${username} with role \${role} should login\`, () => {
+      it(\`should login as \${username} with role \${role}\`, () => {
         loginPage.login(username, password);
-        cy.url().should("include", "/dashboard");
+        cy.url().should("include", "/dashboard.html");
+        loginPage.getWelcomeTitle().should("be.visible");
         cy.getByCy("user-fullname").should("not.be.empty");
       });
     });
@@ -612,24 +1021,30 @@ describe("Login Page — Regression Tests", { tags: ["regression"] }, () => {
 
   describe("Form validation", () => {
     beforeEach(() => {
-      loginPage.openLoginPage();
+      loginPage.visit();
     });
 
-    it("should show validation error with short password", () => {
-      loginPage.enterUserNameInput("admin");
-      loginPage.enterPasswordInput("12");
-      cy.getByCy("login-button").click();
-      cy.getByCy("login-error").should("be.visible");
+    it("should show validation error with password shorter than 4 characters", () => {
+      loginPage
+        .fillUsername("admin")
+        .fillPassword("12")
+        .clickLogin();
+      loginPage.getErrorMessage()
+        .should("be.visible")
+        .and("contain.text", "۴ کاراکتر");
     });
 
     it("should show error with empty username", () => {
-      loginPage.enterPasswordInput("123456");
-      cy.getByCy("login-button").click();
-      cy.getByCy("login-error").should("be.visible");
+      loginPage
+        .fillPassword("123456")
+        .clickLogin();
+      loginPage.getErrorMessage()
+        .should("be.visible")
+        .and("contain.text", "نام کاربری");
     });
   });
 
-  describe("Direct access (without login)", () => {
+  describe("Direct access without login", () => {
     it("should redirect to login page when accessing dashboard directly", () => {
       cy.visit("/dashboard.html");
       cy.url().should("eq", Cypress.config().baseUrl + "/");
@@ -638,7 +1053,7 @@ describe("Login Page — Regression Tests", { tags: ["regression"] }, () => {
 
   describe("Logout", () => {
     it("should return to login page after logout", () => {
-      loginPage.openLoginPage().login("admin", "123456");
+      loginPage.visit().login("admin", "123456");
       cy.url().should("include", "/dashboard.html");
       cy.getByCy("logout-button").click();
       cy.url().should("eq", Cypress.config().baseUrl + "/");
@@ -652,21 +1067,23 @@ describe("Login Page — Regression Tests", { tags: ["regression"] }, () => {
     const content = `const { loginPage } = require("../../pages/loginPage");
 
 describe("Login Page — Regression Tests", { tags: ["regression"] }, () => {
+
   describe("Login with different users", () => {
     beforeEach(() => {
-      loginPage.openLoginPage();
+      loginPage.visit();
     });
 
     const users = [
-      { username: "admin", password: "123456", role: "مدیر سیستم" },
+      { username: "admin",    password: "123456", role: "مدیر سیستم" },
       { username: "operator", password: "123456", role: "اپراتور" },
-      { username: "manager", password: "123456", role: "مدیر پروژه" },
+      { username: "manager",  password: "123456", role: "مدیر پروژه" },
     ];
 
     users.forEach(({ username, password, role }) => {
-      it(\`user \${username} with role \${role} should login\`, () => {
+      it(\`should login as \${username} with role \${role}\`, () => {
         loginPage.login(username, password);
-        cy.url().should("include", "/dashboard");
+        cy.url().should("include", "/dashboard.html");
+        loginPage.getWelcomeTitle().should("be.visible");
         cy.getByCy("user-fullname").should("not.be.empty");
       });
     });
@@ -674,24 +1091,30 @@ describe("Login Page — Regression Tests", { tags: ["regression"] }, () => {
 
   describe("Form validation", () => {
     beforeEach(() => {
-      loginPage.openLoginPage();
+      loginPage.visit();
     });
 
-    it("should show validation error with short password", () => {
-      loginPage.enterUserNameInput("admin");
-      loginPage.enterPasswordInput("12");
-      cy.getByCy("login-button").click();
-      cy.getByCy("login-error").should("be.visible");
+    it("should show validation error with password shorter than 4 characters", () => {
+      loginPage
+        .fillUsername("admin")
+        .fillPassword("12")
+        .clickLogin();
+      loginPage.getErrorMessage()
+        .should("be.visible")
+        .and("contain.text", "۴ کاراکتر");
     });
 
     it("should show error with empty username", () => {
-      loginPage.enterPasswordInput("123456");
-      cy.getByCy("login-button").click();
-      cy.getByCy("login-error").should("be.visible");
+      loginPage
+        .fillPassword("123456")
+        .clickLogin();
+      loginPage.getErrorMessage()
+        .should("be.visible")
+        .and("contain.text", "نام کاربری");
     });
   });
 
-  describe("Direct access (without login)", () => {
+  describe("Direct access without login", () => {
     it("should redirect to login page when accessing dashboard directly", () => {
       cy.visit("/dashboard.html");
       cy.url().should("eq", Cypress.config().baseUrl + "/");
@@ -700,7 +1123,7 @@ describe("Login Page — Regression Tests", { tags: ["regression"] }, () => {
 
   describe("Logout", () => {
     it("should return to login page after logout", () => {
-      loginPage.openLoginPage().login("admin", "123456");
+      loginPage.visit().login("admin", "123456");
       cy.url().should("include", "/dashboard.html");
       cy.getByCy("logout-button").click();
       cy.url().should("eq", Cypress.config().baseUrl + "/");
@@ -715,29 +1138,34 @@ describe("Login Page — Regression Tests", { tags: ["regression"] }, () => {
 
 export function sampleFeature(_o: ScaffoldOptions): FileSpec {
   const content = `@smoke
-Feature: Login
-  As a registered user
-  I want to log in
-  So that I can access my account
+Feature: ورود به سیستم (Login)
 
-  Scenario Outline: Successful login with different users
-    Given I am on the login page
-    When I enter username "<username>" and password "<password>"
-    And I submit the login form
-    Then I should be redirected to the dashboard
-    And my full name "<fullName>" should be displayed
+  Scenario Outline: ورود موفق با کاربران مختلف
+    Given کاربر در صفحه لاگین قرار دارد
+    When نام کاربری "<username>" و رمز عبور "<password>" را وارد می‌کند
+    And روی دکمه ورود کلیک می‌کند
+    Then کاربر به داشبورد هدایت می‌شود
+    And نام "<fullName>" در داشبورد نمایش داده می‌شود
 
     Examples:
       | username | password | fullName    |
-      | admin    | 123456   | Admin User  |
-      | operator | 123456   | Operator    |
+      | admin    | 123456   | مدیر سیستم  |
+      | operator | 123456   | اپراتور تست |
+      | manager  | 123456   | مدیر پروژه  |
 
   @regression
-  Scenario: Login fails with invalid credentials
-    Given I am on the login page
-    When I enter invalid credentials
-    And I submit the login form
-    Then I should see an error message
+  Scenario: نمایش خطا با رمز عبور کوتاه
+    Given کاربر در صفحه لاگین قرار دارد
+    When نام کاربری "admin" و رمز عبور "12" را وارد می‌کند
+    And روی دکمه ورود کلیک می‌کند
+    Then پیام خطای معتبر نمایش داده می‌شود
+
+  @regression
+  Scenario: نمایش خطا با فیلد خالی
+    Given کاربر در صفحه لاگین قرار دارد
+    When رمز عبور "123456" را وارد می‌کند (بدون نام کاربری)
+    And روی دکمه ورود کلیک می‌کند
+    Then پیام خطای معتبر نمایش داده می‌شود
 `;
   return { path: "cypress/e2e/features/login.feature", content };
 }
@@ -746,34 +1174,38 @@ export function sampleStepsTs(): FileSpec {
   const content = `import { Given, When, Then } from "@badeball/cypress-cucumber-preprocessor";
 import { loginPage } from "../../pages/loginPage";
 
-Given("I am on the login page", () => {
-  loginPage.openLoginPage();
+Given("کاربر در صفحه لاگین قرار دارد", () => {
+  loginPage.visit();
 });
 
-When("I enter username {string} and password {string}", (username: string, password: string) => {
-  loginPage.enterUserNameInput(username);
-  loginPage.enterPasswordInput(password);
+When(
+  "نام کاربری {string} و رمز عبور {string} را وارد می‌کند",
+  (username: string, password: string) => {
+    loginPage.fillUsername(username).fillPassword(password);
+  }
+);
+
+When("روی دکمه ورود کلیک می‌کند", () => {
+  loginPage.clickLogin();
 });
 
-When("I enter invalid credentials", () => {
-  loginPage.enterUserNameInput("invalid");
-  loginPage.enterPasswordInput("invalid");
+When(
+  "رمز عبور {string} را وارد می‌کند (بدون نام کاربری)",
+  (password: string) => {
+    loginPage.fillPassword(password);
+  }
+);
+
+Then("کاربر به داشبورد هدایت می‌شود", () => {
+  cy.url().should("include", "/dashboard.html");
 });
 
-When("I submit the login form", () => {
-  loginPage.clickLoginButton();
-});
-
-Then("I should be redirected to the dashboard", () => {
-  cy.url().should("include", "/dashboard");
-});
-
-Then("my full name {string} should be displayed", (fullName: string) => {
+Then("نام {string} در داشبورد نمایش داده می‌شود", (fullName: string) => {
   cy.getByCy("user-fullname").should("contain.text", fullName);
 });
 
-Then("I should see an error message", () => {
-  cy.getByCy("login-error").should("be.visible");
+Then("پیام خطای معتبر نمایش داده می‌شود", () => {
+  loginPage.getErrorMessage().should("be.visible");
 });
 `;
   return { path: "cypress/e2e/step-definitions/loginSteps.ts", content };
@@ -783,34 +1215,38 @@ export function sampleStepsJs(): FileSpec {
   const content = `const { Given, When, Then } = require("@badeball/cypress-cucumber-preprocessor");
 const { loginPage } = require("../../pages/loginPage");
 
-Given("I am on the login page", () => {
-  loginPage.openLoginPage();
+Given("کاربر در صفحه لاگین قرار دارد", () => {
+  loginPage.visit();
 });
 
-When("I enter username {string} and password {string}", (username, password) => {
-  loginPage.enterUserNameInput(username);
-  loginPage.enterPasswordInput(password);
+When(
+  "نام کاربری {string} و رمز عبور {string} را وارد می‌کند",
+  (username, password) => {
+    loginPage.fillUsername(username).fillPassword(password);
+  }
+);
+
+When("روی دکمه ورود کلیک می‌کند", () => {
+  loginPage.clickLogin();
 });
 
-When("I enter invalid credentials", () => {
-  loginPage.enterUserNameInput("invalid");
-  loginPage.enterPasswordInput("invalid");
+When(
+  "رمز عبور {string} را وارد می‌کند (بدون نام کاربری)",
+  (password) => {
+    loginPage.fillPassword(password);
+  }
+);
+
+Then("کاربر به داشبورد هدایت می‌شود", () => {
+  cy.url().should("include", "/dashboard.html");
 });
 
-When("I submit the login form", () => {
-  loginPage.clickLoginButton();
-});
-
-Then("I should be redirected to the dashboard", () => {
-  cy.url().should("include", "/dashboard");
-});
-
-Then("my full name {string} should be displayed", (fullName) => {
+Then("نام {string} در داشبورد نمایش داده می‌شود", (fullName) => {
   cy.getByCy("user-fullname").should("contain.text", fullName);
 });
 
-Then("I should see an error message", () => {
-  cy.getByCy("login-error").should("be.visible");
+Then("پیام خطای معتبر نمایش داده می‌شود", () => {
+  loginPage.getErrorMessage().should("be.visible");
 });
 `;
   return { path: "cypress/e2e/step-definitions/loginSteps.js", content };
@@ -821,19 +1257,19 @@ export function fixturesUsers(_o: ScaffoldOptions): FileSpec {
   "admin": {
     "username": "admin",
     "password": "123456",
-    "fullName": "Admin User",
+    "fullName": "مدیر سیستم",
     "role": "admin"
   },
   "operator": {
     "username": "operator",
     "password": "123456",
-    "fullName": "Operator",
+    "fullName": "اپراتور تست",
     "role": "operator"
   },
   "manager": {
     "username": "manager",
     "password": "123456",
-    "fullName": "Manager",
+    "fullName": "مدیر پروژه",
     "role": "manager"
   }
 }
@@ -974,7 +1410,7 @@ function findJava() {
   return "java" + EXE_SUFFIX;
 }
 
-const allureDist = path.resolve(__dirname, "..", "node_modules", "allure-commandline", "dist");
+const allureDist = path.resolve(__dirname, "..", "..", "node_modules", "allure-commandline", "dist");
 const classpath = path.join(allureDist, "lib", "*") + SEP + path.join(allureDist, "lib", "config");
 const args = process.argv.slice(2).join(" ");
 const javaExe = findJava();
@@ -999,7 +1435,7 @@ function findJava() {
   return "java" + EXE_SUFFIX;
 }
 
-const allureDist = path.resolve(__dirname, "..", "node_modules", "allure-commandline", "dist");
+const allureDist = path.resolve(__dirname, "..", "..", "node_modules", "allure-commandline", "dist");
 const classpath = path.join(allureDist, "lib", "*") + SEP + path.join(allureDist, "lib", "config");
 const args = process.argv.slice(2).join(" ");
 const javaExe = findJava();
@@ -1192,58 +1628,60 @@ export function readme(o: ScaffoldOptions): FileSpec {
   const lines = [
     `# ${o.projectName}`,
     "",
-    o.description || "Cypress test project with POM + Allure + CI/CD.",
+    o.description || "Cypress test project with POM + BDD + Allure + CI/CD.",
     "",
     "## Project Structure",
     "",
     "```",
     "./",
+    "├── frontend/                 # Sample frontend app (login page + API)",
     "├── cypress/",
     "│   ├── e2e/",
-    "│   │   ├── locators/",
-    "│   │   ├── pages/",
-    "│   │   ├── features/",
-    "│   │   ├── step-definitions/",
+    "│   │   ├── locators/         # DOM selectors (data-cy based)",
+    "│   │   ├── pages/            # Page Object Model classes",
+    "│   │   ├── features/         # BDD scenarios (.feature files)",
+    "│   │   ├── step-definitions/ # BDD step implementations",
     "│   │   └── test/",
-    "│   │       ├── smoke/",
-    "│   │       └── regression/",
-    "│   ├── fixtures/",
-    "│   ├── support/",
-    "│   └── utils/",
-    "├── scripts/",
-    "└── cypress.config.ts",
+    "│   │       ├── smoke/        # Quick smoke tests",
+    "│   │       └── regression/   # Comprehensive regression tests",
+    "│   ├── fixtures/             # Test data",
+    "│   ├── support/              # Custom commands + types",
+    "│   └── utils/                # Helper utilities",
+    "├── scripts/                  # Automation scripts",
+    "└── cypress.config.ts         # Cypress configuration",
     "```",
     "",
-    "## Setup",
+    "## Quick Start",
     "",
     "```bash",
+    "# 1. Install dependencies",
     "npm install",
-    "```",
     "",
-    "## Run tests",
+    "# 2. Start the sample frontend app (terminal 1)",
+    "npm run frontend",
     "",
-    "| Task | Command |",
-    "|---|---|",
-    "| Open Cypress UI | \`npm run cy:open\` |",
-    "| Run smoke tests | \`npm run cy:smoke:all\` |",
-    "| Run regression tests | \`npm run cy:regression:all\` |",
+    "# 3. Run tests (terminal 2)",
+    "npm run cy:smoke:all     # Smoke tests (clean → run → report → serve)",
+    "npm run cy:regression:all # Regression tests",
   ];
 
   if (o.bdd) {
-    lines.push("| Run BDD tests | `npm run cy:bdd:all` |");
+    lines.push("npm run cy:bdd:all       # BDD / Cucumber tests");
   }
 
   lines.push(
-    "| Serve smoke report | `npm run serve:smoke` |",
-    "| Serve regression report | `npm run serve:regression` |",
+    "",
+    "# 4. View Allure report",
+    "npm run serve:smoke      # Open smoke report in browser",
+    "```",
     "",
     "## Test Users",
     "",
     "| Username | Password | Role |",
     "|----------|----------|------|",
-    "| admin | 123456 | Admin |",
-    "| operator | 123456 | Operator |",
-    "| manager | 123456 | Manager |",
+    "| admin | 123456 | مدیر سیستم |",
+    "| operator | 123456 | اپراتور |",
+    "| manager | 123456 | مدیر پروژه |",
   );
 
   return { path: "README.md", content: lines.join("\n") + "\n" };

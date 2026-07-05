@@ -58,9 +58,9 @@ export async function newCommand(opts: NewOptions): Promise<void> {
 
   const baseUrl =
     opts.baseUrl ??
-    (opts.yes ? "https://example.cypress.io" : await input({
+    (opts.yes ? "http://localhost:3000" : await input({
       message: "Base URL for tests:",
-      default: "https://example.cypress.io",
+      default: "http://localhost:3000",
     }));
 
   const description = opts.description ?? "";
