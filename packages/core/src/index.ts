@@ -45,6 +45,21 @@ export {
   generateBdd,
 } from "./generator/generate";
 
+// ── Structure Guide ─────────────────────────────────────────────────────────
+export {
+  analyzeProjectStructure,
+  renderStructureGuide,
+  loadStructureGuide,
+  resolveArtifactPath,
+  findNearestGuide,
+} from "./generator/structure-guide";
+export type {
+  StructureGuide,
+  StructureMeta,
+  LayerInfo,
+  NamingConventionEntry,
+} from "./generator/structure-guide";
+
 // ── Chat ────────────────────────────────────────────────────────────────────
 export {
   ChatSession,

@@ -2,6 +2,8 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { getActiveProvider } from "../llm";
 import type { ChatMessage, LLMProvider } from "../llm/types";
+import { loadStructureGuide, resolveArtifactPath, findNearestGuide } from "./structure-guide";
+import type { StructureMeta } from "./structure-guide";
 
 const QA_SYSTEM_PROMPT = `You are an expert QA automation engineer specializing in Cypress.
 You write clean, maintainable test code following these principles:
@@ -18,6 +20,58 @@ unless the file format is markdown. Do not add commentary.`;
 export interface GenerateOptions {
   projectRoot: string;
   provider?: LLMProvider;
+  /** Path to a Structure Guide markdown file. */
+  guide?: string;
+  /** Test tier: "smoke" or "regression" */
+  tier?: "smoke" | "regression";
+}
+
+interface GuideContext {
+  meta: StructureMeta;
+  markdown: string;
+}
+
+function loadGuideContext(guidePath?: string, projectRoot?: string): GuideContext | undefined {
+  const path = guidePath ?? (projectRoot ? findNearestGuide(projectRoot) : undefined);
+  if (!path) return undefined;
+  if (!existsSync(resolve(path))) {
+    console.warn(`[qa] Structure guide not found at "${path}", continuing without guide.`);
+    return undefined;
+  }
+  try {
+    return loadStructureGuide(path);
+  } catch (err) {
+    console.warn(`[qa] Failed to load structure guide: ${err}`);
+    return undefined;
+  }
+}
+
+function buildSystemPrompt(guideCtx?: GuideContext): string {
+  if (!guideCtx) return QA_SYSTEM_PROMPT;
+  return `${QA_SYSTEM_PROMPT}
+
+IMPORTANT — Follow the project structure guide below EXACTLY.
+Use the exact directory paths, file naming conventions, and coding patterns specified.
+
+${guideCtx.markdown}
+
+Generate the file using the correct naming convention and output path for this artifact type.
+Do NOT deviate from the structure guide.`;
+}
+
+function sanitizeName(raw: string): string {
+  return raw
+    .toLowerCase()
+    .replace(/[^a-z0-9\u0600-\u06FF]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 40) || "artifact";
+}
+
+function toPascalCase(raw: string): string {
+  return raw
+    .split(/[-_\s]+/)
+    .map((s) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase())
+    .join("");
 }
 
 async function askLlm(
@@ -29,7 +83,7 @@ async function askLlm(
   const result = await provider.chat(messages, {
     systemPrompt,
     temperature: 0.2,
-    maxTokens: 2048,
+    maxTokens: 4096,
   });
   return stripCodeFences(result.content);
 }
@@ -52,14 +106,23 @@ export async function generateTest(
   options: GenerateOptions,
 ): Promise<{ path: string; content: string }> {
   const provider = options.provider ?? getActiveProvider();
+  const guideCtx = loadGuideContext(options.guide, options.projectRoot);
+  const systemPrompt = buildSystemPrompt(guideCtx);
+
   const prompt = `Write a Cypress spec file for the following test goal:
 ${goal}
 
 Use the Page Object Model pattern. Import page objects from "../pages".
 Use describe/it blocks. Include a beforeEach if appropriate.`;
-  const content = await askLlm(provider, prompt);
-  const safeName = goal.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40).replace(/^-|-$/g, "") || "test";
-  const path = writeArtifact(options.projectRoot, `cypress/e2e/test/smoke/${safeName}.cy.ts`, content);
+
+  const content = await askLlm(provider, prompt, systemPrompt);
+
+  const baseName = sanitizeName(goal);
+  const relativePath = guideCtx
+    ? resolveArtifactPath(guideCtx.meta, "test", baseName, options.tier)
+    : `cypress/e2e/test/${options.tier ?? "smoke"}/${baseName}.cy.ts`;
+
+  const path = writeArtifact(options.projectRoot, relativePath, content);
   return { path, content };
 }
 
@@ -68,13 +131,24 @@ export async function generatePage(
   options: GenerateOptions,
 ): Promise<{ path: string; content: string }> {
   const provider = options.provider ?? getActiveProvider();
+  const guideCtx = loadGuideContext(options.guide, options.projectRoot);
+  const systemPrompt = buildSystemPrompt(guideCtx);
+
+  const pageName = toPascalCase(description.split(/[-_\s]+/).slice(0, 2).join(" "));
+
   const prompt = `Write a Cypress Page Object class for the following page:
 ${description}
 
 Export a class with methods for each element and action. Use data-cy selectors. Use TypeScript.`;
-  const content = await askLlm(provider, prompt);
-  const safeName = description.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40).replace(/^-|-$/g, "") || "page";
-  const path = writeArtifact(options.projectRoot, `cypress/e2e/pages/${safeName}Page.ts`, content);
+
+  const content = await askLlm(provider, prompt, systemPrompt);
+
+  const baseName = sanitizeName(description);
+  const relativePath = guideCtx
+    ? resolveArtifactPath(guideCtx.meta, "page", pageName || baseName)
+    : `cypress/e2e/pages/${baseName}Page.ts`;
+
+  const path = writeArtifact(options.projectRoot, relativePath, content);
   return { path, content };
 }
 
@@ -83,14 +157,25 @@ export async function generateLocators(
   options: GenerateOptions,
 ): Promise<{ path: string; content: string }> {
   const provider = options.provider ?? getActiveProvider();
+  const guideCtx = loadGuideContext(options.guide, options.projectRoot);
+  const systemPrompt = buildSystemPrompt(guideCtx);
+
   const prompt = `Write a Cypress locators constants file for the following:
 ${description}
 
 Export a const object mapping semantic names to Cypress selectors
 (prefer [data-cy="..."] format). Use TypeScript with "as const".`;
-  const content = await askLlm(provider, prompt);
-  const safeName = description.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40).replace(/^-|-$/g, "") || "locators";
-  const path = writeArtifact(options.projectRoot, `cypress/e2e/locators/${safeName}.ts`, content);
+
+  const content = await askLlm(provider, prompt, systemPrompt);
+
+  const baseName = sanitizeName(description);
+  const pageName = toPascalCase(description);
+
+  const relativePath = guideCtx
+    ? resolveArtifactPath(guideCtx.meta, "locators", pageName || baseName)
+    : `cypress/e2e/locators/${baseName}.ts`;
+
+  const path = writeArtifact(options.projectRoot, relativePath, content);
   return { path, content };
 }
 
@@ -99,14 +184,23 @@ export async function generateHelper(
   options: GenerateOptions,
 ): Promise<{ path: string; content: string }> {
   const provider = options.provider ?? getActiveProvider();
+  const guideCtx = loadGuideContext(options.guide, options.projectRoot);
+  const systemPrompt = buildSystemPrompt(guideCtx);
+
   const prompt = `Write a Cypress helper/utility module for the following purpose:
 ${description}
 
 Export pure functions only (no side effects, no DOM access unless asked).
 Use TypeScript with explicit return types.`;
-  const content = await askLlm(provider, prompt);
-  const safeName = description.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40).replace(/^-|-$/g, "") || "helper";
-  const path = writeArtifact(options.projectRoot, `cypress/utils/${safeName}.ts`, content);
+
+  const content = await askLlm(provider, prompt, systemPrompt);
+
+  const baseName = sanitizeName(description);
+  const relativePath = guideCtx
+    ? resolveArtifactPath(guideCtx.meta, "helper", baseName)
+    : `cypress/utils/${baseName}.ts`;
+
+  const path = writeArtifact(options.projectRoot, relativePath, content);
   return { path, content };
 }
 
@@ -115,11 +209,15 @@ export async function generateBdd(
   options: GenerateOptions,
 ): Promise<{ paths: string[]; content: string }> {
   const provider = options.provider ?? getActiveProvider();
+  const guideCtx = loadGuideContext(options.guide, options.projectRoot);
+  const systemPrompt = buildSystemPrompt(guideCtx);
+
   const featurePrompt = `Write a Cucumber .feature file for the following functionality:
 ${description}
 
 Use Feature/Scenario with Given/When/Then steps in plain English.
 Keep scenarios independent and concrete.`;
+
   const stepsPrompt = `Write Cypress step definitions (TypeScript) using
 @badeball/cypress-cucumber-preprocessor Given/When/Then decorators
 for these scenarios:
@@ -128,16 +226,25 @@ ${description}
 Import page objects from "../pages". Implement each step.`;
 
   const [featureContent, stepsContent] = await Promise.all([
-    askLlm(provider, featurePrompt),
-    askLlm(provider, stepsPrompt),
+    askLlm(provider, featurePrompt, systemPrompt),
+    askLlm(provider, stepsPrompt, systemPrompt),
   ]);
 
-  const safeName = description.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40).replace(/^-|-$/g, "") || "feature";
-  const featurePath = writeArtifact(options.projectRoot, `cypress/e2e/features/${safeName}.feature`, featureContent);
-  const stepsPath = writeArtifact(options.projectRoot, `cypress/e2e/step-definitions/${safeName}Steps.ts`, stepsContent);
+  const baseName = sanitizeName(description);
+
+  const featurePath = guideCtx
+    ? resolveArtifactPath(guideCtx.meta, "bdd", baseName)
+    : `cypress/e2e/features/${baseName}.feature`;
+
+  const stepsPath = guideCtx
+    ? resolveArtifactPath(guideCtx.meta, "bddSteps", toPascalCase(description) || baseName)
+    : `cypress/e2e/step-definitions/${baseName}Steps.ts`;
+
+  const absFeaturePath = writeArtifact(options.projectRoot, featurePath, featureContent);
+  const absStepsPath = writeArtifact(options.projectRoot, stepsPath, stepsContent);
 
   return {
-    paths: [featurePath, stepsPath],
+    paths: [absFeaturePath, absStepsPath],
     content: `# Feature\n${featureContent}\n\n# Steps\n${stepsContent}`,
   };
 }

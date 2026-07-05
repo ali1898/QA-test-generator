@@ -1,29 +1,50 @@
-/**
- * `qa chat` — interactive REPL for QA guidance backed by the active LLM.
- *
- * Streams responses token-by-token. Supports slash commands:
- *   /reset   clear conversation
- *   /exit    quit
- *   /help    show commands
- */
 import { input } from "@inquirer/prompts";
-import { ChatSession } from "@qa-test-generator/core";
+import { ChatSession, loadStructureGuide } from "@qa-test-generator/core";
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
 import { ui, chalk } from "../ui";
 import { activeBanner } from "./config";
 
-export async function chatCommand(): Promise<void> {
+export interface ChatOptions {
+  /** Path to a Structure Guide markdown file to use as context. */
+  guide?: string;
+}
+
+export async function chatCommand(opts: ChatOptions = {}): Promise<void> {
   ui.header("QA Chat");
   ui.dim(`Provider: ${activeBanner()}`);
+  if (opts.guide) {
+    ui.dim(`Guide: ${opts.guide}`);
+  }
   console.log(chalk.dim('  Type your question. "/help" for commands, "/exit" to quit.\n'));
 
-  const session = new ChatSession();
+  // Load guide context if provided
+  let guideContext: string | undefined;
+  if (opts.guide) {
+    const guidePath = resolve(opts.guide);
+    if (existsSync(guidePath)) {
+      try {
+        const { markdown } = loadStructureGuide(guidePath);
+        guideContext = markdown;
+        ui.success(`Loaded structure guide (${markdown.length} chars)`);
+        console.log();
+      } catch (err) {
+        ui.warn(`Could not load guide: ${err}`);
+      }
+    } else {
+      ui.warn(`Guide not found: ${guidePath}`);
+    }
+  }
+
+  const session = new ChatSession({
+    context: guideContext,
+  });
 
   while (true) {
     let question: string;
     try {
       question = await input({ message: chalk.cyan(">") });
     } catch {
-      // Ctrl+C / EOF → exit gracefully.
       console.log();
       break;
     }
@@ -45,13 +66,10 @@ export async function chatCommand(): Promise<void> {
       continue;
     }
 
-    // Stream the reply.
     process.stdout.write(chalk.green("<") + " ");
-    let firstChunk = true;
     try {
       await session.sendStream(trimmed, (chunk) => {
         process.stdout.write(chunk);
-        firstChunk = false;
       });
       process.stdout.write("\n\n");
     } catch (err) {

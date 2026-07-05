@@ -1,9 +1,3 @@
-/**
- * `qa generate <type>` — generate a single test artifact via the active LLM.
- *
- * Types: test | page | locators | helper | bdd
- * Each takes a natural-language goal and writes the file(s) into the project.
- */
 import { input } from "@inquirer/prompts";
 import {
   generateTest,
@@ -23,6 +17,10 @@ export interface GenerateOptions {
   projectRoot?: string;
   /** Skip the goal prompt (used with --goal). */
   yes?: boolean;
+  /** Path to a Structure Guide markdown file. */
+  guide?: string;
+  /** Test tier for test generation: smoke (default) or regression. */
+  tier?: "smoke" | "regression";
 }
 
 const PROMPTS: Record<GenerateType, string> = {
@@ -44,7 +42,6 @@ const SUCCESS_LABEL: Record<GenerateType, string> = {
 export async function generateCommand(opts: GenerateOptions): Promise<void> {
   const projectRoot = opts.projectRoot ?? process.cwd();
 
-  // Refuse to run outside a cypress project to keep generated paths sane.
   const goal =
     opts.goal ?? (opts.yes ? "" : await input({ message: PROMPTS[opts.type] }));
   if (!goal.trim()) {
@@ -53,30 +50,38 @@ export async function generateCommand(opts: GenerateOptions): Promise<void> {
   }
 
   ui.dim(`Using project: ${projectRoot}`);
+  if (opts.guide) {
+    ui.dim(`Using structure guide: ${opts.guide}`);
+  }
+  if (opts.tier) {
+    ui.dim(`Test tier: ${opts.tier}`);
+  }
+
+  const baseOptions = { projectRoot, guide: opts.guide, tier: opts.tier };
 
   if (opts.type === "test") {
     const res = await withSpinner("Generating test…", () =>
-      generateTest(goal, { projectRoot }),
+      generateTest(goal, baseOptions),
     );
     printSingle(res.path, res.content, SUCCESS_LABEL.test);
   } else if (opts.type === "page") {
     const res = await withSpinner("Generating page object…", () =>
-      generatePage(goal, { projectRoot }),
+      generatePage(goal, baseOptions),
     );
     printSingle(res.path, res.content, SUCCESS_LABEL.page);
   } else if (opts.type === "locators") {
     const res = await withSpinner("Generating locators…", () =>
-      generateLocators(goal, { projectRoot }),
+      generateLocators(goal, baseOptions),
     );
     printSingle(res.path, res.content, SUCCESS_LABEL.locators);
   } else if (opts.type === "helper") {
     const res = await withSpinner("Generating helper…", () =>
-      generateHelper(goal, { projectRoot }),
+      generateHelper(goal, baseOptions),
     );
     printSingle(res.path, res.content, SUCCESS_LABEL.helper);
   } else if (opts.type === "bdd") {
     const res = await withSpinner("Generating BDD feature + steps…", () =>
-      generateBdd(goal, { projectRoot }),
+      generateBdd(goal, baseOptions),
     );
     ui.success(`${SUCCESS_LABEL.bdd} created:`);
     for (const p of res.paths) console.log(chalk.green("  ✔ ") + chalk.dim(p));

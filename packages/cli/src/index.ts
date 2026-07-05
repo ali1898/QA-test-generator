@@ -1,9 +1,4 @@
 #!/usr/bin/env node
-/**
- * qa — CLI entry point for the QA Test Generator.
- *
- * Wires up commander with the command modules and routes to them.
- */
 import { Command } from "commander";
 import type { ProjectLanguage } from "@qa-test-generator/core";
 import { CORE_VERSION } from "@qa-test-generator/core";
@@ -14,6 +9,7 @@ import { generateCommand, type GenerateType } from "./commands/generate";
 import { chatCommand } from "./commands/chat";
 import { docsCommand, type DocsOptions } from "./commands/docs";
 import { modelsCommand } from "./commands/models";
+import { generateGuideCommand } from "./commands/generate-guide";
 
 const BANNER = chalk.cyan(`
    ██████  ██     ███████     ████████ ███████ ███████ ████████
@@ -47,8 +43,14 @@ Examples:
   $ qa generate helper -g "generate random Iranian national code and phone number"
   $ qa generate bdd -g "checkout scenario with valid coupon"
 
+  # ——— Generate with a Structure Guide (follow an existing project's conventions) ———
+  $ qa generate-guide -p ./my-project -o ./guides/my-guide.md        # Create a guide from a project
+  $ qa generate test -g "login test" --guide ./guides/my-guide.md    # Generate code following the guide
+  $ qa generate page -g "profile page" --guide ./guides/my-guide.md
+
   # ——— Chat with AI QA assistant ———
   $ qa chat
+  $ qa chat --guide ./guides/my-guide.md                             # Chat with project context
 
   # ——— Documentation ———
   $ qa docs                                                         # Markdown docs from existing project
@@ -118,6 +120,8 @@ program
   )
   .option("-g, --goal <text>", "natural-language description of what to generate")
   .option("-p, --project-root <dir>", "project root (default: cwd)")
+  .option("--guide <path>", "path to a Structure Guide markdown file for conventions")
+  .option("--tier <tier>", "test tier: smoke (default) or regression", /^(smoke|regression)$/i)
   .option("-y, --yes", "skip confirmations")
   .action(async (type: GenerateType, opts) => {
     try {
@@ -125,6 +129,8 @@ program
         type,
         goal: opts.goal,
         projectRoot: opts.projectRoot,
+        guide: opts.guide,
+        tier: opts.tier?.toLowerCase() as "smoke" | "regression" | undefined,
         yes: opts.yes,
       });
     } catch (err) {
@@ -137,9 +143,10 @@ program
 program
   .command("chat")
   .description("Chat with an AI QA assistant")
-  .action(async () => {
+  .option("--guide <path>", "path to a Structure Guide markdown file to use as context")
+  .action(async (opts) => {
     try {
-      await chatCommand();
+      await chatCommand({ guide: opts.guide });
     } catch (err) {
       ui.error(err instanceof Error ? err.message : String(err));
       process.exit(1);
@@ -167,6 +174,26 @@ program
         noFile: opts.file === false,
       };
       await docsCommand(docOpts);
+    } catch (err) {
+      ui.error(err instanceof Error ? err.message : String(err));
+      process.exit(1);
+    }
+  });
+
+// ── qa generate-guide ──────────────────────────────────────────────────────
+program
+  .command("generate-guide")
+  .description("Generate a Structure Guide markdown file from an existing Cypress project")
+  .option("-p, --project-root <dir>", "project root to analyze (default: cwd)")
+  .option("-o, --output <path>", "output file path (default: ./structure-guide.md)")
+  .option("-t, --title <title>", "override project name")
+  .action(async (opts) => {
+    try {
+      await generateGuideCommand({
+        projectRoot: opts.projectRoot,
+        output: opts.output,
+        title: opts.title,
+      });
     } catch (err) {
       ui.error(err instanceof Error ? err.message : String(err));
       process.exit(1);
