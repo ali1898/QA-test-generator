@@ -214,6 +214,9 @@ qa generate helper -g "generate random credit card numbers for tests"
 
 # Generate BDD feature + step definitions
 qa generate bdd -g "user search with filters and sorting"
+
+# Generate locators + page + test in one pass (all artifacts)
+qa generate all -g "login page" -u "http://localhost:3000/login"
 ```
 
 **Artifact types:**
@@ -225,12 +228,14 @@ qa generate bdd -g "user search with filters and sorting"
 | `locators` | Selector constants | `cypress/support/locators/<name>Locators.ts` |
 | `helper` | Utility functions | `cypress/support/helpers/<name>.ts` |
 | `bdd` | Feature + Steps | `cypress/e2e/<name>.feature` + `cypress/e2e/<name>/` |
+| `all` | Locators + Page + Test | All three paths above |
 
 **Options:**
 
 | Flag | Description |
 |---|---|
 | `-g, --goal` | Natural-language description (can also be prompted) |
+| `-u, --url` | Page URL to analyze (provides AI context for any type) |
 | `-p, --project-root` | Project root (default: current directory) |
 | `--guide` | Path to a Structure Guide markdown file for project conventions |
 | `--tier` | Test tier: `smoke` (default) or `regression` |

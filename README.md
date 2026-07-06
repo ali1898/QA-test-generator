@@ -107,9 +107,11 @@ Types:
   locators     Generate selector constants
   helper       Generate a utility helper module
   bdd          Generate BDD feature + step definitions
+  all          Generate locators + page + test in one pass
 
 Options:
   -g, --goal <text>              Natural-language description of what to generate
+  -u, --url <url>                Page URL to analyze (provides context for AI generation)
   -p, --project-root <dir>       Project root (default: cwd)
   --guide <path>                 Path to a Structure Guide for project conventions
   --tier <tier>                  Test tier: smoke (default) or regression

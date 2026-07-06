@@ -64,7 +64,7 @@ export async function generateCommand(opts: GenerateOptions): Promise<void> {
   }
 
   let url = opts.url;
-  if (opts.type === "all" && !url && !opts.yes) {
+  if (!url && !opts.yes) {
     url = await promptOptional("Enter the page URL to analyze (e.g. 'http://localhost:3000/login'):");
   }
 

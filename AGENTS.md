@@ -126,10 +126,12 @@ qa new
 ### AI Generation Flow
 
 ```
-qa generate test -g "goal description"
+qa generate test -g "goal description" -u "http://localhost:3000/login"
+  → prompt for goal + URL if not provided and not --yes
   → getActiveProvider() — load LLM from config
   → build system prompt (QA_SYSTEM_PROMPT in generate.ts:8)
   → optionally load Structure Guide for project conventions
+  → inject URL into LLM prompt for richer context
   → call provider.chat() or provider.streamChat()
   → write result to appropriate project directory
 ```
@@ -213,7 +215,7 @@ POM layers strictly separated: locators → pages → tests. Data flow: tests ca
 | Command | Description |
 |---------|-------------|
 | `qa new` | Scaffold a Cypress project (interactive or `--yes`) |
-| `qa generate <type>` | Generate test/page/locators/helper/bdd with AI |
+| `qa generate <type>` | Generate test/page/locators/helper/bdd/all with AI |
 | `qa generate-guide` | Create Structure Guide from existing project |
 | `qa chat` | Interactive QA assistant (supports `--guide` for context) |
 | `qa docs` | Generate project docs (Markdown/HTML/Confluence) |

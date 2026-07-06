@@ -137,7 +137,7 @@ program
   .option("-p, --project-root <dir>", "project root (default: cwd)")
   .option("--guide <path>", "path to a Structure Guide markdown file for conventions")
   .option("--tier <tier>", "test tier: smoke (default) or regression", /^(smoke|regression)$/i)
-  .option("-u, --url <url>", "page URL to analyze (used with 'all' type)")
+  .option("-u, --url <url>", "page URL to analyze (provides context for AI generation)")
   .option("-y, --yes", "skip confirmations")
   .action(async (type: GenerateType, opts) => {
     try {

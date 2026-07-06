@@ -24,6 +24,8 @@ export interface GenerateOptions {
   guide?: string;
   /** Test tier: "smoke" or "regression" */
   tier?: "smoke" | "regression";
+  /** URL of the page/feature being tested, for AI context. */
+  url?: string;
 }
 
 interface GuideContext {
@@ -110,7 +112,7 @@ export async function generateTest(
   const systemPrompt = buildSystemPrompt(guideCtx);
 
   const prompt = `Write a Cypress spec file for the following test goal:
-${goal}
+${goal}${options.url ? `\nURL: ${options.url}` : ""}
 
 Use the Page Object Model pattern. Import page objects from "../../pages".
 Use describe/it blocks. Include a beforeEach if appropriate.`;
@@ -137,7 +139,7 @@ export async function generatePage(
   const pageName = toPascalCase(description.split(/[-_\s]+/).slice(0, 2).join(" "));
 
   const prompt = `Write a Cypress Page Object class for the following page:
-${description}
+${description}${options.url ? `\nURL: ${options.url}` : ""}
 
 Export a class with methods for each element and action. Use data-cy selectors.
 Import locator constants from "../locators/{PascalCase}Locators" and use them in the class.
@@ -163,7 +165,7 @@ export async function generateLocators(
   const systemPrompt = buildSystemPrompt(guideCtx);
 
   const prompt = `Write a Cypress locators constants file for the following:
-${description}
+${description}${options.url ? `\nURL: ${options.url}` : ""}
 
 Export a const object mapping semantic names to Cypress selectors
 (prefer [data-cy="..."] format). Use TypeScript with "as const".`;
@@ -190,7 +192,7 @@ export async function generateHelper(
   const systemPrompt = buildSystemPrompt(guideCtx);
 
   const prompt = `Write a Cypress helper/utility module for the following purpose:
-${description}
+${description}${options.url ? `\nURL: ${options.url}` : ""}
 
 Export pure functions only (no side effects, no DOM access unless asked).
 Use TypeScript with explicit return types.`;
@@ -215,7 +217,7 @@ export async function generateBdd(
   const systemPrompt = buildSystemPrompt(guideCtx);
 
   const featurePrompt = `Write a Cucumber .feature file for the following functionality:
-${description}
+${description}${options.url ? `\nURL: ${options.url}` : ""}
 
 Use Feature/Scenario with Given/When/Then steps in plain English.
 Keep scenarios independent and concrete.`;
@@ -223,7 +225,7 @@ Keep scenarios independent and concrete.`;
   const stepsPrompt = `Write Cypress step definitions (TypeScript) using
 @badeball/cypress-cucumber-preprocessor Given/When/Then decorators
 for these scenarios:
-${description}
+${description}${options.url ? `\nURL: ${options.url}` : ""}
 
 Import page objects from "../pages". Implement each step.`;
 
@@ -253,7 +255,7 @@ Import page objects from "../pages". Implement each step.`;
 
 export async function generateAll(
   description: string,
-  options: GenerateOptions & { url?: string },
+  options: GenerateOptions,
 ): Promise<{ paths: string[]; content: string }> {
   const provider = options.provider ?? getActiveProvider();
   const guideCtx = loadGuideContext(options.guide, options.projectRoot);
