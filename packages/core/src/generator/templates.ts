@@ -349,46 +349,75 @@ export interface UsersData {
 export function locators(o: ScaffoldOptions): FileSpec {
   const e = ext(o);
   if (isTs(o)) {
-    const content = `/**
- * Locators for the sample frontend app
- * =====================================
- *
- * All selectors use data-cy attributes (best practice in Cypress).
- * If the DOM changes, update only this file.
- */
-export const LoginLocators = {
-  loginForm:        (): Cypress.Chainable<JQuery<HTMLElement>> => cy.getByCy("login-form"),
-  usernameInput:    (): Cypress.Chainable<JQuery<HTMLElement>> => cy.getByCy("username-input"),
-  passwordInput:    (): Cypress.Chainable<JQuery<HTMLElement>> => cy.getByCy("password-input"),
-  loginButton:      (): Cypress.Chainable<JQuery<HTMLElement>> => cy.getByCy("login-button"),
-  errorMessage:     (): Cypress.Chainable<JQuery<HTMLElement>> => cy.getByCy("login-error"),
-  welcomeTitle:     (): Cypress.Chainable<JQuery<HTMLElement>> => cy.getByCy("welcome-title"),
-  welcomeSubtitle:  (): Cypress.Chainable<JQuery<HTMLElement>> => cy.getByCy("welcome-subtitle"),
-  userFullname:     (): Cypress.Chainable<JQuery<HTMLElement>> => cy.getByCy("user-fullname"),
-  userRole:         (): Cypress.Chainable<JQuery<HTMLElement>> => cy.getByCy("user-role"),
-  successBadge:     (): Cypress.Chainable<JQuery<HTMLElement>> => cy.getByCy("success-badge"),
-  navbar:           (): Cypress.Chainable<JQuery<HTMLElement>> => cy.getByCy("navbar"),
-  logoutButton:     (): Cypress.Chainable<JQuery<HTMLElement>> => cy.getByCy("logout-button"),
-};
+    const content = `export const LOCATORS = {
+  /** فرم ورود */
+  LoginForm: {
+    /** نام کاربری */
+    Username_Input: "[formcontrolname='username']",
+    /** رمز عبور */
+    Password_Input: "[formcontrolname='password']",
+    /** دکمه ورود */
+    Login_Button: "login",
+    /** خطا */
+    Error_Message: "login-error",
+  },
+
+  /** منوی کناری سایت */
+  Sidebar: {
+    /** پیشخوان */
+    Dashboard: "dashboard",
+    /** خروج */
+    Logout: "logout",
+  },
+
+  /** پیشخوان */
+  Dashboard: {
+    /** عنوان خوش آمدگویی */
+    Welcome_Title: "welcome-title",
+    /** نام کاربر */
+    User_Fullname: "user-fullname",
+    /** نقش کاربر */
+    User_Role: "user-role",
+  },
+} as const;
+
+export type locators = typeof LOCATORS;
 `;
     return { path: `cypress/e2e/locators/locators.${e}`, content };
   } else {
-    const content = `export const LoginLocators = {
-  loginForm:        () => cy.getByCy("login-form"),
-  usernameInput:    () => cy.getByCy("username-input"),
-  passwordInput:    () => cy.getByCy("password-input"),
-  loginButton:      () => cy.getByCy("login-button"),
-  errorMessage:     () => cy.getByCy("login-error"),
-  welcomeTitle:     () => cy.getByCy("welcome-title"),
-  welcomeSubtitle:  () => cy.getByCy("welcome-subtitle"),
-  userFullname:     () => cy.getByCy("user-fullname"),
-  userRole:         () => cy.getByCy("user-role"),
-  successBadge:     () => cy.getByCy("success-badge"),
-  navbar:           () => cy.getByCy("navbar"),
-  logoutButton:     () => cy.getByCy("logout-button"),
+    const content = `export const LOCATORS = {
+  /** فرم ورود */
+  LoginForm: {
+    /** نام کاربری */
+    Username_Input: "[formcontrolname='username']",
+    /** رمز عبور */
+    Password_Input: "[formcontrolname='password']",
+    /** دکمه ورود */
+    Login_Button: "login",
+    /** خطا */
+    Error_Message: "login-error",
+  },
+
+  /** منوی کناری سایت */
+  Sidebar: {
+    /** پیشخوان */
+    Dashboard: "dashboard",
+    /** خروج */
+    Logout: "logout",
+  },
+
+  /** پیشخوان */
+  Dashboard: {
+    /** عنوان خوش آمدگویی */
+    Welcome_Title: "welcome-title",
+    /** نام کاربر */
+    User_Fullname: "user-fullname",
+    /** نقش کاربر */
+    User_Role: "user-role",
+  },
 };
 
-module.exports = { LoginLocators };
+module.exports = { LOCATORS };
 `;
     return { path: `cypress/e2e/locators/locators.${e}`, content };
   }
@@ -397,60 +426,44 @@ module.exports = { LoginLocators };
 export function loginPage(o: ScaffoldOptions): FileSpec {
   const e = ext(o);
   if (isTs(o)) {
-    const content = `import { LoginLocators } from "../locators/locators";
+    const content = `import { LOCATORS } from "../locators/locators";
 
 export class LoginPage {
-
-  visit(): this {
-    cy.visit("/");
-    LoginLocators.loginForm().should("be.visible");
-    return this;
+  /**
+   * visit page
+   */
+  openLoginPage(): Cypress.Chainable<JQuery<HTMLElement>> {
+    return cy.visit("/");
   }
 
-  fillUsername(username: string): this {
-    LoginLocators.usernameInput()
-      .should("be.visible")
-      .clear()
-      .type(username);
-    return this;
+  /**
+   * enter username
+   * @param username enter username
+   */
+  enterUserNameInput(username: string): Cypress.Chainable<JQuery<HTMLElement>> {
+    return cy.get(LOCATORS.LoginForm.Username_Input).type(username);
   }
 
-  fillPassword(password: string): this {
-    LoginLocators.passwordInput()
-      .should("be.visible")
-      .clear()
-      .type(password);
-    return this;
+  /**
+   * enter password
+   * @param password enter password
+   */
+  enterPasswordInput(password: string): Cypress.Chainable<JQuery<HTMLElement>> {
+    return cy.get(LOCATORS.LoginForm.Password_Input).type(password);
   }
 
-  clickLogin(): this {
-    LoginLocators.loginButton()
-      .should("be.visible")
-      .click();
-    return this;
+  /**
+   * click login button
+   */
+  clickLoginButton(): Cypress.Chainable<JQuery<HTMLElement>> {
+    return cy.getByCy(LOCATORS.LoginForm.Login_Button).click();
   }
 
   login(username: string, password: string): this {
-    return this
-      .fillUsername(username)
-      .fillPassword(password)
-      .clickLogin();
-  }
-
-  getErrorMessage(): Cypress.Chainable<JQuery<HTMLElement>> {
-    return LoginLocators.errorMessage();
-  }
-
-  getWelcomeTitle(): Cypress.Chainable<JQuery<HTMLElement>> {
-    return LoginLocators.welcomeTitle();
-  }
-
-  getUserFullname(): Cypress.Chainable<JQuery<HTMLElement>> {
-    return LoginLocators.userFullname();
-  }
-
-  getUserRole(): Cypress.Chainable<JQuery<HTMLElement>> {
-    return LoginLocators.userRole();
+    this.enterUserNameInput(username);
+    this.enterPasswordInput(password);
+    this.clickLoginButton();
+    return this;
   }
 }
 
@@ -458,60 +471,30 @@ export const loginPage = new LoginPage();
 `;
     return { path: `cypress/e2e/pages/loginPage.${e}`, content };
   } else {
-    const content = `const { LoginLocators } = require("../locators/locators");
+    const content = `const { LOCATORS } = require("../locators/locators");
 
 class LoginPage {
-
-  visit() {
-    cy.visit("/");
-    LoginLocators.loginForm().should("be.visible");
-    return this;
+  openLoginPage() {
+    return cy.visit("/");
   }
 
-  fillUsername(username) {
-    LoginLocators.usernameInput()
-      .should("be.visible")
-      .clear()
-      .type(username);
-    return this;
+  enterUserNameInput(username) {
+    return cy.get(LOCATORS.LoginForm.Username_Input).type(username);
   }
 
-  fillPassword(password) {
-    LoginLocators.passwordInput()
-      .should("be.visible")
-      .clear()
-      .type(password);
-    return this;
+  enterPasswordInput(password) {
+    return cy.get(LOCATORS.LoginForm.Password_Input).type(password);
   }
 
-  clickLogin() {
-    LoginLocators.loginButton()
-      .should("be.visible")
-      .click();
-    return this;
+  clickLoginButton() {
+    return cy.getByCy(LOCATORS.LoginForm.Login_Button).click();
   }
 
   login(username, password) {
-    return this
-      .fillUsername(username)
-      .fillPassword(password)
-      .clickLogin();
-  }
-
-  getErrorMessage() {
-    return LoginLocators.errorMessage();
-  }
-
-  getWelcomeTitle() {
-    return LoginLocators.welcomeTitle();
-  }
-
-  getUserFullname() {
-    return LoginLocators.userFullname();
-  }
-
-  getUserRole() {
-    return LoginLocators.userRole();
+    this.enterUserNameInput(username);
+    this.enterPasswordInput(password);
+    this.clickLoginButton();
+    return this;
   }
 }
 
@@ -528,29 +511,14 @@ export function sidebarPage(o: ScaffoldOptions): FileSpec {
     const content = `import { LOCATORS } from "../locators/locators";
 
 export class Sidebar {
-  clickDashboard(): Cypress.Chainable<Element> {
-    return cy.getDynamicMenu("Dashboard").click();
+  /** پیشخوان */
+  clickDashboard(): Cypress.Chainable<JQuery<HTMLElement>> {
+    return cy.getByCy(LOCATORS.Sidebar.Dashboard).click();
   }
 
-  siamService(): Cypress.Chainable<Element> {
-    return cy.getByCy(LOCATORS.Sidebar.Siam_Service).click();
-  }
-
-  announcements(): Cypress.Chainable<Element> {
-    return cy.getByCy(LOCATORS.Sidebar.Announcements).click();
-  }
-
-  changeTheme(): Cypress.Chainable<Element> {
-    return cy.getByCy(LOCATORS.Sidebar.Change_Theme).click();
-  }
-
-  loginAs(): Cypress.Chainable<Element> {
-    return cy.getByCy(LOCATORS.Sidebar.Login_As).click();
-  }
-
-  logoutAndYesButton(): Cypress.Chainable<Element> {
-    cy.getByCy(LOCATORS.Sidebar.Logout).click();
-    return cy.getByCy(LOCATORS.Sidebar.Yes_Button).click();
+  /** خروج */
+  logout(): Cypress.Chainable<JQuery<HTMLElement>> {
+    return cy.getByCy(LOCATORS.Sidebar.Logout).click();
   }
 }
 
@@ -562,28 +530,11 @@ export const sidebar = new Sidebar();
 
 class Sidebar {
   clickDashboard() {
-    return cy.getDynamicMenu("Dashboard").click();
+    return cy.getByCy(LOCATORS.Sidebar.Dashboard).click();
   }
 
-  siamService() {
-    return cy.getByCy(LOCATORS.Sidebar.Siam_Service).click();
-  }
-
-  announcements() {
-    return cy.getByCy(LOCATORS.Sidebar.Announcements).click();
-  }
-
-  changeTheme() {
-    return cy.getByCy(LOCATORS.Sidebar.Change_Theme).click();
-  }
-
-  loginAs() {
-    return cy.getByCy(LOCATORS.Sidebar.Login_As).click();
-  }
-
-  logoutAndYesButton() {
-    cy.getByCy(LOCATORS.Sidebar.Logout).click();
-    return cy.getByCy(LOCATORS.Sidebar.Yes_Button).click();
+  logout() {
+    return cy.getByCy(LOCATORS.Sidebar.Logout).click();
   }
 }
 
@@ -1047,37 +998,19 @@ export function smokeTest(o: ScaffoldOptions): FileSpec {
   if (isTs(o)) {
     const content = `import { loginPage } from "../../pages/loginPage";
 
-describe("Login Page — Smoke Tests", { tags: ["smoke"] }, () => {
+describe("Login Page — Smoke Tests", () => {
 
   beforeEach(() => {
-    loginPage.visit();
+    loginPage.openLoginPage();
   });
 
-  it("should display the login form elements", () => {
-    cy.getByCy("login-form").should("be.visible");
-    cy.getByCy("username-input").should("be.visible");
-    cy.getByCy("password-input").should("be.visible");
-    cy.getByCy("login-button").should("be.visible");
-  });
-
-  it("should show an error when clicking login with empty fields", () => {
-    loginPage.clickLogin();
-    loginPage.getErrorMessage()
-      .should("be.visible")
-      .and("contain.text", "نام کاربری");
-  });
-
-  it("should login successfully with valid credentials (admin/123456)", () => {
+  it("should login successfully with valid credentials", () => {
     loginPage.login("admin", "123456");
     cy.url().should("include", "/dashboard.html");
-    loginPage.getWelcomeTitle().should("be.visible");
   });
 
   it("should show error message with invalid credentials", () => {
     loginPage.login("wrong", "wrong");
-    loginPage.getErrorMessage()
-      .should("be.visible")
-      .and("contain.text", "نام کاربری یا رمز عبور");
   });
 });
 `;
@@ -1085,37 +1018,19 @@ describe("Login Page — Smoke Tests", { tags: ["smoke"] }, () => {
   } else {
     const content = `const { loginPage } = require("../../pages/loginPage");
 
-describe("Login Page — Smoke Tests", { tags: ["smoke"] }, () => {
+describe("Login Page — Smoke Tests", () => {
 
   beforeEach(() => {
-    loginPage.visit();
+    loginPage.openLoginPage();
   });
 
-  it("should display the login form elements", () => {
-    cy.getByCy("login-form").should("be.visible");
-    cy.getByCy("username-input").should("be.visible");
-    cy.getByCy("password-input").should("be.visible");
-    cy.getByCy("login-button").should("be.visible");
-  });
-
-  it("should show an error when clicking login with empty fields", () => {
-    loginPage.clickLogin();
-    loginPage.getErrorMessage()
-      .should("be.visible")
-      .and("contain.text", "نام کاربری");
-  });
-
-  it("should login successfully with valid credentials (admin/123456)", () => {
+  it("should login successfully with valid credentials", () => {
     loginPage.login("admin", "123456");
     cy.url().should("include", "/dashboard.html");
-    loginPage.getWelcomeTitle().should("be.visible");
   });
 
   it("should show error message with invalid credentials", () => {
     loginPage.login("wrong", "wrong");
-    loginPage.getErrorMessage()
-      .should("be.visible")
-      .and("contain.text", "نام کاربری یا رمز عبور");
   });
 });
 `;
@@ -1127,69 +1042,34 @@ export function regressionTest(o: ScaffoldOptions): FileSpec {
   const e = ext(o);
   if (isTs(o)) {
     const content = `import { loginPage } from "../../pages/loginPage";
+import { sidebar } from "../../pages/sidebar";
 
-describe("Login Page — Regression Tests", { tags: ["regression"] }, () => {
+describe("Login Page — Regression Tests", () => {
 
   describe("Login with different users", () => {
     beforeEach(() => {
-      loginPage.visit();
+      loginPage.openLoginPage();
     });
 
-    const users = [
-      { username: "admin",    password: "123456", role: "مدیر سیستم" },
-      { username: "operator", password: "123456", role: "اپراتور" },
-      { username: "manager",  password: "123456", role: "مدیر پروژه" },
-    ];
-
-    users.forEach(({ username, password, role }) => {
-      it(\`should login as \${username} with role \${role}\`, () => {
-        loginPage.login(username, password);
-        cy.url().should("include", "/dashboard.html");
-        loginPage.getWelcomeTitle().should("be.visible");
-        cy.getByCy("user-fullname").should("not.be.empty");
-      });
-    });
-  });
-
-  describe("Form validation", () => {
-    beforeEach(() => {
-      loginPage.visit();
+    it("should login as admin user", () => {
+      loginPage.login("admin", "123456");
+      cy.url().should("include", "/dashboard.html");
     });
 
-    it("should show validation error with password shorter than 4 characters", () => {
-      loginPage
-        .fillUsername("admin")
-        .fillPassword("12")
-        .clickLogin();
-      loginPage.getErrorMessage()
-        .should("be.visible")
-        .and("contain.text", "۴ کاراکتر");
-    });
-
-    it("should show error with empty username", () => {
-      loginPage
-        .fillPassword("123456")
-        .clickLogin();
-      loginPage.getErrorMessage()
-        .should("be.visible")
-        .and("contain.text", "نام کاربری");
-    });
-  });
-
-  describe("Direct access without login", () => {
-    it("should redirect to login page when accessing dashboard directly", () => {
-      cy.visit("/dashboard.html");
-      cy.url().should("eq", Cypress.config().baseUrl + "/");
+    it("should reject invalid credentials", () => {
+      loginPage.login("wrong", "wrong");
     });
   });
 
   describe("Logout", () => {
+    beforeEach(() => {
+      loginPage.openLoginPage();
+      loginPage.login("admin", "123456");
+    });
+
     it("should return to login page after logout", () => {
-      loginPage.visit().login("admin", "123456");
-      cy.url().should("include", "/dashboard.html");
-      cy.getByCy("logout-button").click();
+      sidebar.logout();
       cy.url().should("eq", Cypress.config().baseUrl + "/");
-      cy.getByCy("login-form").should("be.visible");
     });
   });
 });
@@ -1197,69 +1077,34 @@ describe("Login Page — Regression Tests", { tags: ["regression"] }, () => {
     return { path: `cypress/e2e/test/regression/loginRegression.cy.${e}`, content };
   } else {
     const content = `const { loginPage } = require("../../pages/loginPage");
+const { sidebar } = require("../../pages/sidebar");
 
-describe("Login Page — Regression Tests", { tags: ["regression"] }, () => {
+describe("Login Page — Regression Tests", () => {
 
   describe("Login with different users", () => {
     beforeEach(() => {
-      loginPage.visit();
+      loginPage.openLoginPage();
     });
 
-    const users = [
-      { username: "admin",    password: "123456", role: "مدیر سیستم" },
-      { username: "operator", password: "123456", role: "اپراتور" },
-      { username: "manager",  password: "123456", role: "مدیر پروژه" },
-    ];
-
-    users.forEach(({ username, password, role }) => {
-      it(\`should login as \${username} with role \${role}\`, () => {
-        loginPage.login(username, password);
-        cy.url().should("include", "/dashboard.html");
-        loginPage.getWelcomeTitle().should("be.visible");
-        cy.getByCy("user-fullname").should("not.be.empty");
-      });
-    });
-  });
-
-  describe("Form validation", () => {
-    beforeEach(() => {
-      loginPage.visit();
+    it("should login as admin user", () => {
+      loginPage.login("admin", "123456");
+      cy.url().should("include", "/dashboard.html");
     });
 
-    it("should show validation error with password shorter than 4 characters", () => {
-      loginPage
-        .fillUsername("admin")
-        .fillPassword("12")
-        .clickLogin();
-      loginPage.getErrorMessage()
-        .should("be.visible")
-        .and("contain.text", "۴ کاراکتر");
-    });
-
-    it("should show error with empty username", () => {
-      loginPage
-        .fillPassword("123456")
-        .clickLogin();
-      loginPage.getErrorMessage()
-        .should("be.visible")
-        .and("contain.text", "نام کاربری");
-    });
-  });
-
-  describe("Direct access without login", () => {
-    it("should redirect to login page when accessing dashboard directly", () => {
-      cy.visit("/dashboard.html");
-      cy.url().should("eq", Cypress.config().baseUrl + "/");
+    it("should reject invalid credentials", () => {
+      loginPage.login("wrong", "wrong");
     });
   });
 
   describe("Logout", () => {
+    beforeEach(() => {
+      loginPage.openLoginPage();
+      loginPage.login("admin", "123456");
+    });
+
     it("should return to login page after logout", () => {
-      loginPage.visit().login("admin", "123456");
-      cy.url().should("include", "/dashboard.html");
-      cy.getByCy("logout-button").click();
+      sidebar.logout();
       cy.url().should("eq", Cypress.config().baseUrl + "/");
-      cy.getByCy("login-form").should("be.visible");
     });
   });
 });

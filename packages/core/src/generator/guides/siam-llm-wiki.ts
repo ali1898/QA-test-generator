@@ -524,7 +524,91 @@ tsconfig.json
 
 ## Coding Patterns
 
-class-based Page Objects, singleton instance export, custom commands (getByCy), separate locator imports, exported helper functions, as const for literal types, UPPER_SNAKE_CASE constants
+### Locator Files (cypress/e2e/locators/)
+\`\`\`
+export const NAME_LOCATORS = {
+  GroupName: {
+    /** JSDoc for the field */
+    Field_Name: "selector",     // data-cy value (string) OR CSS selector
+  }
+} as const;
+
+export type nameLocators = typeof NAME_LOCATORS;
+\`\`\`
+- Named export: UPPER_SNAKE_CASE constant with \`_LOCATORS\` suffix
+- Inner object groups fields by page section (PascalCase, no suffix)
+- Field names: PascalCase_with_underscores for multi-word
+- Each field has a JSDoc comment above it
+- Values: plain string (for data-cy) or CSS selector in brackets (e.g. \`"[formcontrolname='kind']"\`)
+- Suffixed with \`as const\`
+- Exported type: camelCase of the constant name
+
+### Page Object Files (cypress/e2e/pages/)
+\`\`\`
+import { NAME_LOCATORS } from "../locators/nameLocators";
+
+export class PageName {
+  /** JSDoc description */
+  methodName(param: string): Cypress.Chainable<JQuery<HTMLElement>> {
+    return cy.get(NAME_LOCATORS.Group.Field).type(param);
+  }
+
+  /** JSDoc description */
+  clickButton(): Cypress.Chainable<JQuery<void>> {
+    return cy.getByCy(NAME_LOCATORS.Group.Button_Field).click();
+  }
+
+  /** Combined action */
+  combinedAction(param: string): this {
+    this.stepOne(param);
+    this.stepTwo();
+    return this;
+  }
+}
+
+export const pageName = new PageName();
+\`\`\`
+- Import locator constants from relative path \`"../locators/nameLocators"\`
+- Export class, export singleton instance (camelCase)
+- Each method returns \`Cypress.Chainable<JQuery<HTMLElement>>\` or \`Cypress.Chainable<JQuery<void>>\`
+- Use \`cy.get(LOCATORS.Group.Field)\` for CSS selectors, \`cy.getByCy(LOCATORS.Group.Field)\` for data-cy values
+- Methods have JSDoc comments (\`/** description */\`)
+- Combined methods for multi-step operations
+
+### Test Files (cypress/e2e/test/smoke/ or cypress/e2e/test/regression/)
+\`\`\`
+import { pageName } from "../../pages/pageName";
+
+describe("Feature Description", () => {
+  beforeEach(() => {
+    pageName.openPage();
+  });
+
+  it("should do something", () => {
+    pageName.someAction();
+    // assertions
+  });
+});
+\`\`\`
+- Import page singletons from \`"../../pages/pageName"\` (test at \`test/smoke/\`) or \`"../../../pages/pageName"\` (test in deeper subdir)
+- Simple \`describe\`/\`beforeEach\`/\`it\` blocks
+- No tags metadata on describe
+- Use page methods for all interactions
+
+### Helper Files (cypress/support/heplers/)
+\`\`\`
+export function someHelper(options: OptionsType): void {
+  // helper logic using page objects and custom commands
+}
+\`\`\`
+- Named export functions
+- Accept options object parameter
+- Use page objects and custom commands internally
+
+### Custom Commands (cypress/support/commands.ts + index.d.ts)
+- \`Cypress.Commands.add("name", ...)\` with JSDoc
+- Type declarations in \`index.d.ts\` using \`declare global { namespace Cypress { interface Chainable { ... } } }\`
+- JSDoc on both implementation and type declaration
 
 ## Custom Cypress Commands
 

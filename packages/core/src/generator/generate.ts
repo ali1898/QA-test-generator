@@ -6,12 +6,26 @@ import { loadStructureGuide, resolveArtifactPath, findNearestGuide } from "./str
 import type { StructureMeta } from "./structure-guide";
 
 const QA_SYSTEM_PROMPT = `You are an expert QA automation engineer specializing in Cypress.
-You write clean, maintainable test code following these principles:
-- Page Object Model for reusing UI interactions
-- Robust selectors (prefer data-cy attributes, avoid brittle CSS/XPath)
-- BDD-style Cucumber features using Given/When/Then in plain English
-- Custom Cypress commands for repeated actions
-- Clear assertions with meaningful failure messages
+You write clean, maintainable test code following these conventions:
+
+### Locator Files
+- Export a const object in UPPER_SNAKE_CASE with "_LOCATORS" suffix
+- Fields grouped by page section (PascalCase keys), each with JSDoc comment
+- Field values: plain string for data-cy, or CSS selector in brackets
+- Suffix with "as const", export type: "export type nameLocators = typeof NAME_LOCATORS"
+
+### Page Object Files
+- Import locator constants from "../locators/{name}Locators"
+- Export class + singleton: "export const pageName = new PageName()"
+- Each method returns Cypress.Chainable<JQuery<HTMLElement>> or <JQuery<void>>
+- Use cy.get(LOCATORS.Group.Field) for CSS selectors, cy.getByCy(...) for data-cy values
+- Methods have JSDoc comments, combined methods return "this"
+
+### Test Files
+- Import page singletons from "../../pages/pageName"
+- Simple describe/beforeEach/it blocks (no tags metadata)
+- Use page methods for all interactions
+
 - No flaky waits (no cy.wait with arbitrary timeouts)
 
 Return ONLY the requested file content. Do not add markdown code fences
@@ -114,8 +128,9 @@ export async function generateTest(
   const prompt = `Write a Cypress spec file for the following test goal:
 ${goal}${options.url ? `\nURL: ${options.url}` : ""}
 
-Use the Page Object Model pattern. Import page objects from "../../pages".
-Use describe/it blocks. Include a beforeEach if appropriate.`;
+Use the Page Object Model pattern. Import page singletons from "../../pages/pageName".
+Use describe/it blocks (no tags metadata). Include a beforeEach if appropriate.
+Use page methods for all interactions. Do NOT use cy.getByCy directly — use page methods only.`;
 
   const content = await askLlm(provider, prompt, systemPrompt);
 
@@ -141,9 +156,14 @@ export async function generatePage(
   const prompt = `Write a Cypress Page Object class for the following page:
 ${description}${options.url ? `\nURL: ${options.url}` : ""}
 
-Export a class with methods for each element and action. Use data-cy selectors.
-Import locator constants from "../locators/{PascalCase}Locators" and use them in the class.
-Use TypeScript. Also export a singleton instance of the class.`;
+Import locator constants from "../locators/{PascalCase}Locators".
+Export a class with methods for each element/action.
+Each method returns Cypress.Chainable<JQuery<HTMLElement>> (or <JQuery<void>> for .click()).
+Use cy.get(LOCATORS.Group.Field) for CSS selectors, cy.getByCy(LOCATORS.Group.Field) for data-cy.
+Add JSDoc comments on each method.
+Also export a singleton: export const camelName = new ClassName();
+Do NOT use chaining (return this) for individual actions — return the Cypress chain instead.
+Only chain (return this) in combined action methods like login().`;
 
   const content = await askLlm(provider, prompt, systemPrompt);
 
@@ -167,8 +187,11 @@ export async function generateLocators(
   const prompt = `Write a Cypress locators constants file for the following:
 ${description}${options.url ? `\nURL: ${options.url}` : ""}
 
-Export a const object mapping semantic names to Cypress selectors
-(prefer [data-cy="..."] format). Use TypeScript with "as const".`;
+Export a const object in UPPER_SNAKE_CASE with "_LOCATORS" suffix.
+Group fields by page section (PascalCase keys), each with a JSDoc comment.
+Field values are plain strings: CSS selector (e.g. "[formcontrolname='kind']") or data-cy value (e.g. "login").
+Suffix with "as const" and export a type: export type nameLocators = typeof NAME_LOCATORS;
+Do NOT use function-style locators. Use flat string values only.`;
 
   const content = await askLlm(provider, prompt, systemPrompt);
 
@@ -268,12 +291,18 @@ export async function generateAll(
   const locPrompt = `You are generating a Cypress locators file for a page described below.
 Page description: ${description}${options.url ? `\nURL: ${options.url}` : ""}
 
-Write a TypeScript constants file exporting a const object mapping semantic names to
-Cypress selectors using [data-cy="..."] format. Use "as const".
-The object will be named "${pageName}Locators".
-Each value must be a function returning Cypress.Chainable<JQuery<HTMLElement>>, e.g.:
-  export const ${pageName}Locators = {
-    someElement: (): Cypress.Chainable<JQuery<HTMLElement>> => cy.getByCy("some-element"),
+Write a TypeScript constants file exporting a const object.
+Use UPPER_SNAKE_CASE with "_LOCATORS" suffix for the constant name (e.g. "LOGIN_LOCATORS").
+Group fields by page section (PascalCase keys), each with a JSDoc comment above it.
+Field values are plain strings: CSS selector (e.g. "[formcontrolname='kind']") or data-cy value (e.g. "login").
+Suffix with "as const" and export a type: export type nameLocators = typeof NAME_LOCATORS.
+
+Example structure:
+  export const ${pageName.toUpperCase()}_LOCATORS = {
+    SectionName: {
+      /** description */
+      Field_Name: "selector",
+    },
   } as const;
 
 Include locators for: form fields, buttons, error messages, navigation elements, and any
@@ -293,11 +322,15 @@ other interactive elements the page would likely have based on the description.`
 Page description: ${description}${options.url ? `\nURL: ${options.url}` : ""}
 
 The locators file has already been created at "../locators/${baseName}Locators" with
-a const object named "${pageName}Locators". Import it and use its selectors in every method.
+a UPPER_SNAKE_CASE const. Import it and use its selectors in every method.
 
-Export a class named "${pageName}Page" with methods that chain (return "this").
-Each method should call the corresponding locator and perform actions (click, type, etc.).
-Also export a singleton instance: export const ${baseName}Page = new ${pageName}Page();
+Export a class named "${pageName}Page".
+Each method returns Cypress.Chainable<JQuery<HTMLElement>> (or <JQuery<void>> for .click()).
+Use cy.get(LOCATORS.Group.Field) for CSS selectors, cy.getByCy(LOCATORS.Group.Field) for data-cy.
+Add JSDoc comments on each method.
+Also export a singleton: export const something = new ${pageName}Page();
+Do NOT chain methods (return this) for individual actions — return the Cypress chain instead.
+Only use chaining in combined action methods.
 
 Include methods for: visit(), all form interactions, submit/click, getting error messages,
 and any page-specific actions based on the description.`;
@@ -315,12 +348,13 @@ and any page-specific actions based on the description.`;
   const testPrompt = `You are generating a Cypress test spec file in TypeScript.
 Test scenario: ${description}${options.url ? `\nURL: ${options.url}` : ""}
 
-The Page Object has been created at "../../pages/${baseName}Page" exporting "${baseName}Page".
-Import it with: import { ${baseName}Page } from "../../pages/${baseName}Page";
+The Page Object has been created at "../../pages/${baseName}Page" with a singleton export.
+Import the singleton: import { somethingPage } from "../../pages/${baseName}Page";
 
-Write describe/it blocks with ${options.tier === "regression" ? "regression" : "smoke"} tests.
-Include a beforeEach that calls ${baseName}Page.visit().
-Test happy path, validation errors, and edge cases. Use cy.getByCy for any direct selectors.`;
+Write describe/it blocks (no tags metadata) with ${options.tier === "regression" ? "regression" : "smoke"} tests.
+Include a beforeEach that calls the page method to navigate.
+Use page methods for all interactions. Do NOT use cy.getByCy or cy.get directly.
+Test happy path, validation errors, and edge cases.`;
 
   const testContent = await askLlm(provider, testPrompt, systemPrompt);
 

@@ -187,13 +187,13 @@ The output of `qa new` produces a Cypress project with:
 my-project/
 ├── cypress/
 │   ├── e2e/
-│   │   ├── locators/          # *Locators.ts — data-cy selector constants
-│   │   ├── pages/             # *Page.ts — Page Object classes
+│   │   ├── locators/          # *Locators.ts — UPPER_SNAKE_CASE const objects with as const
+│   │   ├── pages/             # *Page.ts — class + singleton export, methods return Cypress.Chainable
 │   │   ├── features/          # *.feature — Gherkin scenarios (BDD)
 │   │   ├── step-definitions/  # Step implementations (BDD)
 │   │   └── test/
-│   │       ├── smoke/         # Smoke test specs
-│   │       └── regression/    # Regression test specs
+│   │       ├── smoke/         # Smoke test specs (.cy.ts)
+│   │       └── regression/    # Regression test specs (.cy.ts)
 │   ├── support/
 │   │   ├── pages/             # (aliased as @pages)
 │   │   ├── locators/          # (aliased as @locators)
@@ -209,7 +209,15 @@ my-project/
 └── package.json
 ```
 
-POM layers strictly separated: locators → pages → tests. Data flow: tests call page methods, pages call locators, locators wrap `cy.get` with `data-cy` selectors.
+POM layers strictly separated: locators → pages → tests. Data flow: tests call page methods, pages call locators, locators hold flat string selectors.
+
+### Layer Conventions
+
+| Layer | Export Pattern | Method Pattern | Import Path |
+|-------|---------------|----------------|-------------|
+| **Locators** | `export const NAME_LOCATORS = { ... } as const` + `export type nameLocators = typeof NAME_LOCATORS` | N/A (flat string values: CSS selector or data-cy) | — |
+| **Pages** | `export class PageName { ... }` + `export const pageName = new PageName()` | Returns `Cypress.Chainable<JQuery<HTMLElement>>`; uses `cy.get(LOCATORS.Group.Field)` for CSS, `cy.getByCy(...)` for data-cy; JSDoc on each method | `import { NAME_LOCATORS } from "../locators/nameLocators"` |
+| **Tests** | Simple `describe`/`beforeEach`/`it` (no `tags` metadata) | Calls page methods only, no direct `cy.get`/`cy.getByCy` | `import { pageName } from "../../pages/pageName"` |
 
 ## CLI Commands
 
