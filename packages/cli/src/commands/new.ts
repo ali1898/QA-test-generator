@@ -19,6 +19,7 @@ export interface NewOptions {
   description?: string;
   install?: boolean;
   llmWiki?: boolean;
+  scenarios?: boolean;
   /** Skip all prompts using defaults + flags (for scripting). */
   yes?: boolean;
 }
@@ -77,6 +78,8 @@ export async function newCommand(opts: NewOptions): Promise<void> {
     opts.install ?? (opts.yes ? true : await confirm({ message: "Run npm install now?", default: true }));
   const llmWiki =
     opts.llmWiki ?? (opts.yes ? false : await confirm({ message: "Include LLM-Wiki from reference project?", default: false }));
+  const scenarios =
+    opts.scenarios ?? (opts.yes ? false : await confirm({ message: "Include sample scenario files in scenarios/?", default: false }));
 
   // ── Echo the plan ──
   console.log();
@@ -88,6 +91,7 @@ export async function newCommand(opts: NewOptions): Promise<void> {
   console.log(chalk.dim("  baseUrl:") + `   ${baseUrl}`);
   console.log(chalk.dim("  install:") + `   ${installDeps ? "yes" : "no"}`);
   console.log(chalk.dim("  llm-wiki:") + `  ${llmWiki ? "yes" : "no"}`);
+  console.log(chalk.dim("  scenarios:") + ` ${scenarios ? "yes" : "no"}`);
   console.log();
 
   // ── Scaffold ──
@@ -102,6 +106,7 @@ export async function newCommand(opts: NewOptions): Promise<void> {
       baseUrl,
       installDeps,
       llmWiki,
+      scenarios,
     });
   });
 

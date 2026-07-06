@@ -1,4 +1,5 @@
-import { input } from "@inquirer/prompts";
+import { input, select } from "@inquirer/prompts";
+import { readFileSync } from "node:fs";
 import {
   generateTest,
   generatePage,
@@ -25,6 +26,12 @@ export interface GenerateOptions {
   tier?: "smoke" | "regression";
   /** URL for the page/feature to analyze (used with "all" type). */
   url?: string;
+  /** Pre-written scenario (skips Phase 0). */
+  scenario?: string;
+  /** Read scenario from this file instead of Phase 0. */
+  scenarioFile?: string;
+  /** Override name for file/class naming (instead of deriving from goal). */
+  name?: string;
 }
 
 const PROMPTS: Record<GenerateType, string> = {
@@ -71,6 +78,51 @@ export async function generateCommand(opts: GenerateOptions): Promise<void> {
     url = await promptOptional("Enter the page URL to analyze (e.g. 'http://localhost:3000/login'):");
   }
 
+  // ── Interactive prompts specific to "all" type ──
+  let scenario = opts.scenario;
+  let name = opts.name;
+  let tier = opts.tier;
+
+  if (opts.type === "all" && !opts.yes) {
+    if (!opts.name) {
+      name = await promptOptional("Override name for file/class naming (leave empty to derive from goal):");
+    }
+
+    if (!opts.scenario && !opts.scenarioFile) {
+      const scenarioSrc = await select({
+        message: "How to provide the scenario?",
+        choices: [
+          { name: "Let AI generate it (Phase 0)", value: "auto" },
+          { name: "Type it in now", value: "inline" },
+          { name: "Read from a file", value: "file" },
+        ],
+      });
+      if (scenarioSrc === "inline") {
+        scenario = await promptOptional("Paste the scenario (Markdown with **bold** actions/elements):");
+      } else if (scenarioSrc === "file") {
+        const filePath = await promptOptional("Path to scenario file:");
+        if (filePath) {
+          try {
+            scenario = readFileSync(filePath, "utf-8");
+          } catch (err) {
+            ui.error(`Failed to read scenario file: ${err}`);
+            process.exit(1);
+          }
+        }
+      }
+    }
+
+    if (!opts.tier) {
+      tier = await select<"smoke" | "regression">({
+        message: "Test tier:",
+        choices: [
+          { name: "Smoke (default)", value: "smoke" },
+          { name: "Regression", value: "regression" },
+        ],
+      });
+    }
+  }
+
   console.log(chalk.hex("#00d4ff")("\n╭──────────────────────────────────────────────╮"));
   console.log(chalk.hex("#00d4ff")("│") + chalk.bold.white("           🎯 AI Test Generator             ") + chalk.hex("#00d4ff")(" │"));
   console.log(chalk.hex("#00d4ff")("╰──────────────────────────────────────────────╯"));
@@ -78,16 +130,32 @@ export async function generateCommand(opts: GenerateOptions): Promise<void> {
   if (opts.guide) {
     console.log(chalk.hex("#feca57")("  Guide: ") + chalk.dim(opts.guide));
   }
-  if (opts.tier) {
-    console.log(chalk.hex("#ff9ff3")("  Tier: ") + chalk.dim(opts.tier));
+  if (tier) {
+    console.log(chalk.hex("#ff9ff3")("  Tier: ") + chalk.dim(tier));
+  }
+  if (name) {
+    console.log(chalk.hex("#feca57")("  Name: ") + chalk.dim(name));
+  }
+  if (scenario) {
+    console.log(chalk.hex("#48dbfb")("  Scenario: ") + chalk.dim("provided"));
   }
   console.log();
 
-  const baseOptions = { projectRoot, guide: opts.guide, tier: opts.tier, url };
+  // ── Handle --scenario-file for non-interactive mode ──
+  if (!scenario && opts.scenarioFile) {
+    try {
+      scenario = readFileSync(opts.scenarioFile, "utf-8");
+    } catch (err) {
+      ui.error(`Failed to read scenario file: ${err}`);
+      process.exit(1);
+    }
+  }
+
+  const baseOptions = { projectRoot, guide: opts.guide, tier, url, scenario, name };
 
   if (opts.type === "all") {
     const res = await withSpinner("Generating all artifacts (locators + page + test)…", () =>
-      generateAll(goal, { ...baseOptions, url }),
+      generateAll(goal, { ...baseOptions, url, scenario, name } as Parameters<typeof generateAll>[1]),
     );
     console.log(chalk.green("  ✔ ") + chalk.bold(`${SUCCESS_LABEL.all} created:`));
     for (const p of res.paths) console.log(chalk.green("    ✔ ") + chalk.dim(p));

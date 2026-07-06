@@ -45,6 +45,7 @@ export {
   generateBdd,
   generateAll,
   generateCommand,
+  generateScenario,
 } from "./generator/generate";
 
 // ── Structure Guide ─────────────────────────────────────────────────────────

@@ -66,6 +66,7 @@ qa new [options]
 | `--baseUrl <url>`          | Base URL for tests                                 |
 | `-d, --description <text>` | Project description                                |
 | `--llm-wiki` | Include LLM-Wiki (Structure Guide from reference project) |
+| `--scenarios` | Include sample scenario .md files in scenarios/ |
 | `--install / --no-install` | Run npm install (default: true) |
 | `-y, --yes` | Skip all prompts |
 
@@ -74,7 +75,7 @@ qa new [options]
 ```bash
 qa generate <type> [options]
 
-Types: test | page | locators | helper | bdd | all
+Types: test | page | locators | helper | command | bdd | all
 ```
 
 | Option                     | Description                                       |
@@ -84,7 +85,39 @@ Types: test | page | locators | helper | bdd | all
 | `-p, --project-root <dir>` | Project root (default: cwd)                       |
 | `--guide <path>`           | Path to a Structure Guide for project conventions |
 | `--tier <tier>`            | Test tier: `smoke` (default) or `regression`      |
+| `--scenario <text>`        | Pre-written scenario (skips Phase 0, 'all' type) |
+| `--scenario-file <path>`   | Read scenario from file (skips Phase 0, 'all' type) |
+| `--name <name>`            | Override file/class naming (instead of deriving from goal) |
 | `-y, --yes`                | Skip confirmations                                |
+
+### Scenario Writer
+
+```bash
+qa scenario [options]
+```
+
+Write and refine AI-generated test scenarios interactively. Saves to `scenarios/*.md` for use with `qa g all --scenario-file`.
+
+| Option | Description |
+|--------|-------------|
+| `-g, --goal <text>` | Natural-language description of the scenario |
+| `-p, --project-root <dir>` | Project root (default: cwd) |
+| `--guide <path>` | Structure Guide for context |
+| `-y, --yes` | Skip prompts, use defaults |
+
+```bash
+# Interactive mode — describe → generate → refine → save
+qa scenario
+
+# With flags (non-interactive)
+qa scenario -g "checkout with coupon code" -y
+
+# With Structure Guide context
+qa scenario --guide ./my-guide.md
+
+# Use with qa generate all
+qa g all -g "checkout" --scenario-file scenarios/checkout-with-coupon-code.md -u "http://localhost:3000"
+```
 
 ### Structure Guide (Learn from Existing Projects)
 
@@ -146,7 +179,7 @@ qa config      # Configure LLM providers (local + cloud)
 qa models      # List available models from the active provider
 ```
 
-**Supported providers**: Ollama, LM Studio, llama.cpp, 9Router, OpenRouter, Gemini, OpenCode Zen.
+**Supported providers**: Ollama, LM Studio, llama.cpp, Hermes, OpenRouter, Gemini, OpenCode Zen.
 
 Config is persisted at `~/.qa-test-gen/config.json`.
 
@@ -157,7 +190,7 @@ Config is persisted at `~/.qa-test-gen/config.json`.
 | Ollama       | Local | 11434        | No               |
 | LM Studio    | Local | 1234         | No               |
 | llama.cpp    | Local | 8080         | No               |
-| 9Router      | Local | 8000         | No               |
+| Hermes       | Local | 8000         | No               |
 | OpenRouter   | Cloud | —            | Yes              |
 | Gemini       | Cloud | —            | Yes              |
 | OpenCode Zen | Cloud | —            | Yes              |

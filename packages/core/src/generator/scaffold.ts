@@ -19,6 +19,8 @@ import {
   readme,
   regressionTest,
   sampleFeature,
+  scenarioLogin,
+  scenarioSearch,
   sidebarPage,
   sampleStepsJs,
   sampleStepsTs,
@@ -89,6 +91,11 @@ export function collectFiles(o: ScaffoldOptions): FileSpec[] {
 
   if (o.llmWiki) {
     files.push({ path: ".qa-guide.md", content: SIAM_LLM_WIKI });
+  }
+
+  if (o.scenarios) {
+    files.push(scenarioLogin(o));
+    files.push(scenarioSearch(o));
   }
 
   return files;

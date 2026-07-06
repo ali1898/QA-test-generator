@@ -50,7 +50,8 @@ QA-test-generator/
 │               ├── chat.ts          # qa chat — interactive QA session
 │               ├── docs.ts          # qa docs — generate docs
 │               ├── config.ts        # qa config — manage providers
-│               └── models.ts        # qa models — list models
+│               ├── models.ts        # qa models — list models
+│               └── scenario.ts      # qa scenario — write AI scenarios
 ├── TUTORIAL.md                # ~770-line comprehensive tutorial
 ├── README.md                  # Project overview
 └── package.json               # Root workspace config
@@ -132,6 +133,28 @@ qa generate test -g "goal description" -u "http://localhost:3000/login"
   → inject URL into LLM prompt for richer context
   → call provider.chat() or provider.streamChat()
   → write result to appropriate project directory
+
+qa generate all -g "login page" -u "http://localhost:3000/login"
+  → Phase 0: LLM generates a step-by-step Markdown scenario (bold actions + elements)
+  → Phase 1: LLM generates locators (flat UPPER_SNAKE_CASE) for scenario elements
+  → Phase 2: LLM generates page object with methods matching scenario steps
+  → Phase 3: LLM generates test spec implementing the scenario
+  → Each phase uses exact import paths computed from resolveArtifactPath() or baseName
+
+  # Skip Phase 0 with a pre-written scenario
+  qa generate all -g "login" --scenario "1. **Visit** /login\n2. **Type** \"admin\" into **username**"
+
+  # Read scenario from a file (best for long scenarios)
+  qa generate all -g "login" --scenario-file ./scenario.md
+
+  # Use --name for clean filenames with non-English goals
+  qa generate all -g "ورود به سایت" --name "LoginPage" -u "http://localhost:3000/login"
+
+qa scenario -g "checkout with coupon"
+  → LLM generates a Markdown scenario in bold-action/element format
+  → Interactive loop: view → Save / Refine / Regenerate / Cancel
+  → Saves to scenarios/<name>.md
+  → Ready to use with qa g all --scenario-file scenarios/<name>.md
 ```
 
 ## Code Conventions
@@ -203,6 +226,7 @@ my-project/
 │   │   └── types/             # Shared interfaces
 │   └── fixtures/              # Test data (users.json)
 ├── frontend/                  # Sample app (login + dashboard)
+├── scenarios/                  # Sample scenario .md files (when --scenarios)
 ├── scripts/                   # Allure generate/open, serve, orchestration
 ├── cypress.config.ts
 ├── tsconfig.json
@@ -215,18 +239,19 @@ POM layers strictly separated: locators → pages → tests. Data flow: tests ca
 
 | Layer | Export Pattern | Method Pattern | Import Path |
 |-------|---------------|----------------|-------------|
-| **Locators** | `export const NAME_LOCATORS = { ... } as const` + `export type nameLocators = typeof NAME_LOCATORS` | N/A (flat string values: CSS selector or data-cy) | — |
-| **Pages** | `export class PageName { ... }` + `export const pageName = new PageName()` | Returns `Cypress.Chainable<JQuery<HTMLElement>>`; uses `cy.get(LOCATORS.Group.Field)` for CSS, `cy.getByCy(...)` for data-cy; JSDoc on each method | `import { NAME_LOCATORS } from "../locators/nameLocators"` |
+| **Locators** | `export const NAME_LOCATORS = { ... } as const` + `export type nameLocators = typeof NAME_LOCATORS` | **Scaffold**: nested groups per section. **AI-generated (flat)**: top-level UPPER_SNAKE_CASE keys | — |
+| **Pages** | `export class PageName { ... }` + `export const pageName = new PageName()` | Returns `Cypress.Chainable<JQuery<HTMLElement>>`; uses `cy.get(LOCATORS.Field)` for CSS (flat), `cy.getByCy(LOCATORS.Field)` for data-cy; JSDoc on each method | `import { LOCATORS } from "../locators/nameLocators"` |
 | **Tests** | Simple `describe`/`beforeEach`/`it` (no `tags` metadata) | Calls page methods only, no direct `cy.get`/`cy.getByCy` | `import { pageName } from "../../pages/pageName"` |
 
 ## CLI Commands
 
 | Command | Description |
 |---------|-------------|
-| `qa new` | Scaffold a Cypress project (interactive or `--yes`, `--llm-wiki`) |
-| `qa generate <type>` | Generate with AI: test/page/locators/helper/command/bdd/all (supports `--url`, `--guide`, `--tier`, `--yes`) |
+| `qa new` | Scaffold a Cypress project (interactive or `--yes`, `--llm-wiki`, `--scenarios`) |
+| `qa generate <type>` | Generate with AI: test/page/locators/helper/command/bdd/all (supports `--url`, `--guide`, `--tier`, `--scenario`, `--scenario-file`, `--name`, `--yes`) |
 | `qa generate-guide` / `qa gg` | Create Structure Guide from existing project (interactive or `--yes`) |
 | `qa chat` | Interactive QA assistant (supports `--guide` for context) |
 | `qa docs` | Generate project docs (Markdown/HTML/Confluence, interactive or `--yes`) |
 | `qa config` | Manage LLM providers |
 | `qa models` | List models from active provider |
+| `qa scenario` | Write AI-generated scenarios (interactive edit loop, saves to `scenarios/*.md`, supports `--guide`, `--goal`, `--yes`) |

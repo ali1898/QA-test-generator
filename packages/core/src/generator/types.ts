@@ -25,6 +25,8 @@ export const scaffoldOptionsSchema = z.object({
   installDeps: z.boolean().default(true),
   /** Include LLM-Wiki (Structure Guide from reference project). */
   llmWiki: z.boolean().default(false),
+  /** Include sample scenario markdown files in scenarios/. */
+  scenarios: z.boolean().default(false),
 });
 
 export type ScaffoldOptions = z.infer<typeof scaffoldOptionsSchema>;

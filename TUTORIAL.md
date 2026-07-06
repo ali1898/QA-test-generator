@@ -26,6 +26,7 @@ using LLM providers (local + cloud).
   - [`qa generate-guide` — Create Structure Guides](#qa-generate-guide--create-structure-guides)
   - [`qa chat` — Interactive QA Assistant](#qa-chat--interactive-qa-assistant)
   - [`qa docs` — Generate Documentation](#qa-docs--generate-documentation)
+  - [`qa scenario` — Write AI Scenarios](#qa-scenario--write-ai-scenarios)
   - [`qa config` — Manage Providers](#qa-config--manage-providers)
   - [`qa models` — List Available Models](#qa-models--list-available-models)
 - [Working with Providers](#working-with-providers)
@@ -177,6 +178,7 @@ qa new --name my-app \
 | `-d, --description` | `""` | Project description |
 | `--install / --no-install` | `true` | Run `npm install` |
 | `--llm-wiki` | `false` | Include LLM-Wiki (Structure Guide from reference project for AI generation context) |
+| `--scenarios` | `false` | Include sample scenario .md files in scenarios/ |
 | `-y, --yes` | — | Skip all prompts |
 
 **Scaffolded structure:**
@@ -234,6 +236,7 @@ qa generate all -g "login page" -u "http://localhost:3000/login"
 | `page` | Page Object class | `cypress/e2e/pages/<name>Page.ts` |
 | `locators` | Selector constants | `cypress/e2e/locators/<name>.ts` |
 | `helper` | Utility functions | `cypress/support/helpers/<name>.helper.ts` |
+| `command` | Custom Cypress command | `cypress/support/commands.ts` (appended) |
 | `bdd` | Feature + Steps | `cypress/e2e/features/<name>.feature` + `cypress/e2e/step-definitions/<name>.steps.ts` |
 | `all` | Locators + Page + Test | All three paths above |
 
@@ -246,6 +249,9 @@ qa generate all -g "login page" -u "http://localhost:3000/login"
 | `-p, --project-root` | Project root (default: current directory) |
 | `--guide` | Path to a Structure Guide markdown file for project conventions |
 | `--tier` | Test tier: `smoke` (default) or `regression` |
+| `--scenario` | Pre-written scenario in Markdown (skips Phase 0, 'all' type only) |
+| `--scenario-file` | Read scenario from file (skips Phase 0, 'all' type only) |
+| `--name` | Override name for file/class naming (instead of deriving from goal) |
 | `-y, --yes` | Skip confirmations |
 
 **Using Structure Guides:**
@@ -490,6 +496,62 @@ Local: no (cloud)
 If no models are returned:
 - For local providers: ensure your server is running (`ollama serve`, LM Studio, etc.)
 - For cloud providers: verify your API key and network connection
+
+---
+
+### `qa scenario` — Write AI Scenarios
+
+Writes test scenarios in the bold-action/element Markdown format and saves them
+to `scenarios/*.md`. The interactive loop lets you generate, refine, and save.
+
+```bash
+# Interactive — describe → generate → edit loop
+qa scenario
+```
+
+```
+? Describe the scenario you want to write: checkout with coupon
+─── Generated Scenario ───
+## Scenario: Checkout with Coupon
+
+1. **Visit** /cart
+2. **Click** **checkout button**
+3. **Type** "SAVE20" into **coupon input**
+4. **Click** **apply coupon button**
+5. **Assert** **discount message** is visible
+6. **Click** **place order button**
+──────────────────────────
+
+? What would you like to do?
+  Save it
+  Refine it — describe what to change
+  Regenerate from scratch
+  Cancel
+
+? Enter filename (without .md, leave empty for auto): checkout-with-coupon
+
+  ✔ Scenario saved: scenarios/checkout-with-coupon.md
+```
+
+**Non-interactive mode:**
+
+```bash
+qa scenario -g "user login with remember me" -y
+# → scenarios/user-login-with-remember-me.md
+
+qa scenario -g "search" --guide ./guides/my-guide.md -y
+```
+
+**Use with `qa generate all`:**
+
+```bash
+qa g all -g "checkout" \
+  --scenario-file scenarios/checkout-with-coupon.md \
+  -u "http://localhost:3000" \
+  --name "Checkout"
+```
+
+This skips Phase 0 and uses your approved scenario directly.
 
 ---
 

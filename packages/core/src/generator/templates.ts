@@ -1944,6 +1944,34 @@ export function readme(o: ScaffoldOptions): FileSpec {
   return { path: "README.md", content: lines.join("\n") + "\n" };
 }
 
+export function scenarioLogin(_o: ScaffoldOptions): FileSpec {
+  return {
+    path: "scenarios/login-scenario.md",
+    content: `## Scenario: Login with Valid Credentials
+
+1. **Visit** /login
+2. **Type** "admin" into **username input**
+3. **Type** "password123" into **password input**
+4. **Click** **login button**
+5. **Assert** **dashboard** is visible with user name
+`,
+  };
+}
+
+export function scenarioSearch(_o: ScaffoldOptions): FileSpec {
+  return {
+    path: "scenarios/search-scenario.md",
+    content: `## Scenario: Search for a Product
+
+1. **Visit** /search
+2. **Type** "laptop" into **search input**
+3. **Click** **search button**
+4. **Assert** **product results** are visible
+5. **Assert** **result count** shows more than 0 items
+`,
+  };
+}
+
 export function structureGuide(o: ScaffoldOptions): FileSpec {
   const lang = o.language === "typescript" ? "TypeScript" : "JavaScript";
   const e = o.language === "typescript" ? "ts" : "js";

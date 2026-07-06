@@ -10,6 +10,7 @@ import { chatCommand } from "./commands/chat";
 import { docsCommand, type DocsOptions } from "./commands/docs";
 import { modelsCommand } from "./commands/models";
 import { generateGuideCommand } from "./commands/generate-guide";
+import { scenarioCommand, type ScenarioOptions } from "./commands/scenario";
 
 const BANNER =
   chalk.hex("#00d4ff")(`
@@ -38,13 +39,14 @@ program
     `
 ${chalk.bold.hex("#feca57")("⚡ Commands")}
 
-  ${chalk.bold("qa new")}                ${chalk.dim("Scaffold a complete Cypress project (POM + BDD + Allure)")}
-  ${chalk.bold("qa generate")} / ${chalk.bold("qa g")}  ${chalk.dim("Generate with AI (test|page|locators|helper|command|bdd|all — supports --url, --guide, --tier, --yes)")}
+  ${chalk.bold("qa new")}                ${chalk.dim("Scaffold a complete Cypress project (POM + BDD + Allure + scenarios)")}
+  ${chalk.bold("qa generate")} / ${chalk.bold("qa g")}  ${chalk.dim("Generate with AI (test|page|locators|helper|command|bdd|all — supports --url, --guide, --tier, --scenario, --scenario-file, --name, --yes)")}
   ${chalk.bold("qa generate-guide")} / ${chalk.bold("qa gg")}  ${chalk.dim("Create a Structure Guide (interactive or --project-root, --output, --yes)")}
   ${chalk.bold("qa chat")}               ${chalk.dim("Interactive QA assistant (supports --guide for context)")}
   ${chalk.bold("qa docs")}               ${chalk.dim("Generate Markdown/HTML docs (interactive or --project-root, --output, --yes, --confluence)")}
   ${chalk.bold("qa config")}             ${chalk.dim("Manage LLM providers (local + cloud)")}
   ${chalk.bold("qa models")}             ${chalk.dim("List models from the active provider")}
+  ${chalk.bold("qa scenario")}           ${chalk.dim("Write a test scenario with AI (interactive edit-and-save loop, saves to scenarios/*.md)")}
 
 ${chalk.bold.hex("#48dbfb")("📦 Examples")}
 
@@ -52,6 +54,7 @@ ${chalk.bold.hex("#48dbfb")("📦 Examples")}
   $ qa new
   $ qa new --name my-app -l typescript --bdd --allure -y
   $ qa new --name my-app --llm-wiki
+  $ qa new --name my-app --scenarios -y
 
   ${chalk.dim("# — Generate artifacts with AI —")}
   $ qa g test -g "login with empty fields should show error"
@@ -60,6 +63,13 @@ ${chalk.bold.hex("#48dbfb")("📦 Examples")}
   $ qa g all -g "login page" -u "http://localhost:3000"
   $ qa g locators -g "checkout form elements" --guide ./guides/my-guide.md
   $ qa g command -g "login via API with username/password"
+
+  ${chalk.dim("# — Use a pre-written scenario (skip Phase 0) —")}
+  $ qa g all -g "login" --scenario "1. **Visit** /login\n2. **Type** \\"admin\\" into **username input**\n3. **Click** **login button**"
+  $ qa g all -g "login" --scenario-file ./scenario.md --name "LoginPage"
+
+  ${chalk.dim("# — Use --name for clean file/class naming with non-English goals —")}
+  $ qa g all -g "ورود با نام کاربری و رمز عبور" --name "LoginPage" -u "http://localhost:3000/login"
 
   ${chalk.dim("# — Generate everything at once —")}
   $ qa g all -g "login page with username, password, and remember-me" -u "http://localhost:3000"
@@ -78,6 +88,11 @@ ${chalk.bold.hex("#48dbfb")("📦 Examples")}
   $ qa docs --confluence --confluence-config ./confluence.json
   $ qa config
   $ qa models
+
+  ${chalk.dim("# — Write scenarios —")}
+  $ qa scenario                 ${chalk.dim("(interactive — describe → generate → refine → save)")}
+  $ qa scenario -g "checkout with coupon code" -y
+  $ qa scenario --guide ./my-guide.md
 
 ${chalk.dim("╭─")} ${chalk.hex("#ff6b6b")("💡")} ${chalk.dim("Windows users: use")} ${chalk.bold("npm run qa")} ${chalk.dim("instead of bare")} ${chalk.bold("qa")} ${chalk.dim("─╮")}
 ${chalk.dim("╰─")} ${chalk.hex("#feca57")("🐞")} ${chalk.dim("Report issues:")} ${chalk.underline("https://github.com/anomalyco/QA-test-generator/issues")} ${chalk.dim("─╯")}
@@ -102,6 +117,7 @@ program
   .option("-d, --description <text>", "project description")
   .option("--no-install", "skip running npm install")
   .option("--llm-wiki", "include LLM-Wiki (Structure Guide) from reference project")
+  .option("--scenarios", "include sample scenario .md files in scenarios/")
   .option("-y, --yes", "skip prompts, use defaults + provided flags")
   .action(async (opts) => {
     try {
@@ -116,6 +132,7 @@ program
         description: opts.description,
         install: opts.install,
         llmWiki: opts.llmWiki,
+        scenarios: opts.scenarios,
         yes: opts.yes,
       });
     } catch (err) {
@@ -145,6 +162,9 @@ program
   .option("--guide <path>", "path to a Structure Guide markdown file for conventions")
   .option("--tier <tier>", "test tier: smoke (default) or regression", /^(smoke|regression)$/i)
   .option("-u, --url <url>", "page URL to analyze (provides context for AI generation)")
+  .option("--scenario <text>", "pre-written scenario in Markdown (skips Phase 0, 'all' type only)")
+  .option("--scenario-file <path>", "read scenario from file (skips Phase 0, 'all' type only)")
+  .option("--name <name>", "override name for file/class naming (instead of deriving from goal)")
   .option("-y, --yes", "skip confirmations")
   .action(async (type: GenerateType, opts) => {
     try {
@@ -155,6 +175,9 @@ program
         guide: opts.guide,
         tier: opts.tier?.toLowerCase() as "smoke" | "regression" | undefined,
         url: opts.url,
+        scenario: opts.scenario,
+        scenarioFile: opts.scenarioFile,
+        name: opts.name,
         yes: opts.yes,
       });
     } catch (err) {
@@ -249,6 +272,29 @@ program
   .action(async () => {
     try {
       await modelsCommand();
+    } catch (err) {
+      ui.error(err instanceof Error ? err.message : String(err));
+      process.exit(1);
+    }
+  });
+
+// ── qa scenario ─────────────────────────────────────────────────────────────
+program
+  .command("scenario")
+  .description("Write a test scenario with AI (interactive loop + save to scenarios/*.md)")
+  .option("-g, --goal <text>", "natural-language description of the scenario")
+  .option("-p, --project-root <dir>", "project root (default: cwd)")
+  .option("--guide <path>", "path to a Structure Guide markdown file for conventions")
+  .option("-y, --yes", "skip prompts, use defaults")
+  .action(async (opts) => {
+    try {
+      const scOpts: ScenarioOptions = {
+        description: opts.goal,
+        projectRoot: opts.projectRoot,
+        guide: opts.guide,
+        yes: opts.yes,
+      };
+      await scenarioCommand(scOpts);
     } catch (err) {
       ui.error(err instanceof Error ? err.message : String(err));
       process.exit(1);

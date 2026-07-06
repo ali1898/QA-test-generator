@@ -10,15 +10,15 @@ You write clean, maintainable test code following these conventions:
 
 ### Locator Files
 - Export a const object in UPPER_SNAKE_CASE with "_LOCATORS" suffix
-- Fields grouped by page section (PascalCase keys), each with JSDoc comment
-- Field values: plain string for data-cy, or CSS selector in brackets
+- Flat structure (top-level keys only, no nesting), each key is UPPER_SNAKE_CASE with JSDoc
+- Field values: plain string (data-cy value), or CSS selector in brackets
 - Suffix with "as const", export type: "export type nameLocators = typeof NAME_LOCATORS"
 
 ### Page Object Files
 - Import locator constants from "../locators/{name}Locators"
 - Export class + singleton: "export const pageName = new PageName()"
 - Each method returns Cypress.Chainable<JQuery<HTMLElement>> or <JQuery<void>>
-- Use cy.get(LOCATORS.Group.Field) for CSS selectors, cy.getByCy(...) for data-cy values
+- Use cy.get(LOCATORS.FIELD_NAME) for CSS selectors, cy.getByCy(LOCATORS.FIELD_NAME) for data-cy
 - Methods have JSDoc comments, combined methods return "this"
 
 ### Test Files
@@ -40,6 +40,10 @@ export interface GenerateOptions {
   tier?: "smoke" | "regression";
   /** URL of the page/feature being tested, for AI context. */
   url?: string;
+  /** Pre-written scenario in Markdown (skips Phase 0 LLM generation). */
+  scenario?: string;
+  /** Override name used for file/class naming (instead of deriving from description). */
+  name?: string;
 }
 
 interface GuideContext {
@@ -276,6 +280,24 @@ Import page objects from "../pages". Implement each step.`;
   };
 }
 
+function camelCase(str: string): string {
+  return str.charAt(0).toLowerCase() + str.slice(1);
+}
+
+function extractElementsFromScenario(scenario: string): string[] {
+  const elements: string[] = [];
+  const boldRegex = /\*\*([^*]+)\*\*/g;
+  let match;
+  const actions = new Set(["visit", "type", "click", "assert", "select", "check", "uncheck", "hover", "scroll", "wait"]);
+  while ((match = boldRegex.exec(scenario)) !== null) {
+    const word = match[1].trim().toLowerCase();
+    if (!actions.has(word) && !elements.includes(match[1].trim())) {
+      elements.push(match[1].trim());
+    }
+  }
+  return elements;
+}
+
 export async function generateAll(
   description: string,
   options: GenerateOptions,
@@ -284,87 +306,155 @@ export async function generateAll(
   const guideCtx = loadGuideContext(options.guide, options.projectRoot);
   const systemPrompt = buildSystemPrompt(guideCtx);
 
-  const baseName = sanitizeName(description);
-  const pageName = toPascalCase(description);
+  const namingSrc = options.name || description;
+  const baseName = sanitizeName(namingSrc);
+  const pageName = toPascalCase(namingSrc);
 
-  // Phase 1: generate locators with context about the page/URL
-  const locPrompt = `You are generating a Cypress locators file for a page described below.
-Page description: ${description}${options.url ? `\nURL: ${options.url}` : ""}
+  // ── Phase 0: Generate a structured step-by-step scenario in Markdown ──────
+  let scenario: string;
+  if (options.scenario) {
+    scenario = options.scenario;
+  } else {
+    const scenarioPrompt = `You are planning a Cypress test step by step.
 
-Write a TypeScript constants file exporting a const object.
-Use UPPER_SNAKE_CASE with "_LOCATORS" suffix for the constant name (e.g. "LOGIN_LOCATORS").
-Group fields by page section (PascalCase keys), each with a JSDoc comment above it.
-Field values are plain strings: CSS selector (e.g. "[formcontrolname='kind']") or data-cy value (e.g. "login").
-Suffix with "as const" and export a type: export type nameLocators = typeof NAME_LOCATORS.
+Goal: ${description}${options.url ? `\nURL: ${options.url}` : ""}
 
-Example structure:
-  export const ${pageName.toUpperCase()}_LOCATORS = {
-    SectionName: {
-      /** description */
-      Field_Name: "selector",
-    },
-  } as const;
+Output a test scenario in Markdown format. Each step uses **Action** and **Element** in bold.
+Follow this format exactly:
 
-Include locators for: form fields, buttons, error messages, navigation elements, and any
-other interactive elements the page would likely have based on the description.`;
+## Scenario
+1. **Visit** <page>
+2. **Type** "<value>" into **<element>**
+3. **Click** **<element>**
+4. **Assert** **<element>** are visible
 
-  const locContent = await askLlm(provider, locPrompt, systemPrompt);
+Rules:
+- Actions: Visit, Type, Click, Assert, Select, Check, Uncheck, Hover, Scroll, Wait
+- Put action and element in **bold**
+- Put typed values in "double quotes"
+- Keep steps concise and focused on test flow
+- Do NOT include code fences or extra commentary`;
 
-  const locFileName = pageName || baseName;
-  const locPath = guideCtx
-    ? resolveArtifactPath(guideCtx.meta, "locators", locFileName)
+    scenario = await askLlm(provider, scenarioPrompt, systemPrompt);
+  }
+  const elements = extractElementsFromScenario(scenario);
+
+  // ── Compute actual file paths ──────────────────────────────────────────────
+  const locConstName = `${pageName.toUpperCase()}_LOCATORS`;
+  const locRelPath = guideCtx
+    ? resolveArtifactPath(guideCtx.meta, "locators", pageName)
     : `cypress/e2e/locators/${baseName}Locators.ts`;
-
-  const absLocPath = writeArtifact(options.projectRoot, locPath, locContent);
-
-  // Phase 2: generate page object that imports locators
-  const pagePrompt = `You are generating a Cypress Page Object class in TypeScript.
-Page description: ${description}${options.url ? `\nURL: ${options.url}` : ""}
-
-The locators file has already been created at "../locators/${baseName}Locators" with
-a UPPER_SNAKE_CASE const. Import it and use its selectors in every method.
-
-Export a class named "${pageName}Page".
-Each method returns Cypress.Chainable<JQuery<HTMLElement>> (or <JQuery<void>> for .click()).
-Use cy.get(LOCATORS.Group.Field) for CSS selectors, cy.getByCy(LOCATORS.Group.Field) for data-cy.
-Add JSDoc comments on each method.
-Also export a singleton: export const something = new ${pageName}Page();
-Do NOT chain methods (return this) for individual actions — return the Cypress chain instead.
-Only use chaining in combined action methods.
-
-Include methods for: visit(), all form interactions, submit/click, getting error messages,
-and any page-specific actions based on the description.`;
-
-  const pageContent = await askLlm(provider, pagePrompt, systemPrompt);
-
-  const pageFileName = pageName || baseName;
-  const pagePath = guideCtx
-    ? resolveArtifactPath(guideCtx.meta, "page", pageFileName)
+  const pageRelPath = guideCtx
+    ? resolveArtifactPath(guideCtx.meta, "page", pageName)
     : `cypress/e2e/pages/${baseName}Page.ts`;
-
-  const absPagePath = writeArtifact(options.projectRoot, pagePath, pageContent);
-
-  // Phase 3: generate a test spec that imports the page object
-  const testPrompt = `You are generating a Cypress test spec file in TypeScript.
-Test scenario: ${description}${options.url ? `\nURL: ${options.url}` : ""}
-
-The Page Object has been created at "../../pages/${baseName}Page" with a singleton export.
-Import the singleton: import { somethingPage } from "../../pages/${baseName}Page";
-
-Write describe/it blocks (no tags metadata) with ${options.tier === "regression" ? "regression" : "smoke"} tests.
-Include a beforeEach that calls the page method to navigate.
-Use page methods for all interactions. Do NOT use cy.getByCy or cy.get directly.
-Test happy path, validation errors, and edge cases.`;
-
-  const testContent = await askLlm(provider, testPrompt, systemPrompt);
-
-  const testPath = guideCtx
+  const testRelPath = guideCtx
     ? resolveArtifactPath(guideCtx.meta, "test", baseName, options.tier)
     : `cypress/e2e/test/${options.tier ?? "smoke"}/${baseName}.cy.ts`;
 
-  const absTestPath = writeArtifact(options.projectRoot, testPath, testContent);
+  const locFileName = locRelPath.split("/").pop()!.replace(/\.ts$/, "");
+  const pageFileName = pageRelPath.split("/").pop()!.replace(/\.ts$/, "");
+  const testFileNamePrfx = testRelPath.split("/").pop()!.replace(/\.cy\.ts$/, "");
+
+  // Relative import paths between artifact directories:
+  // locators/ → pages/ = ../pages/X  (siblings under cypress/e2e/)
+  // pages/   → locators/ = ../locators/X
+  // test/*/  → pages/ = ../../pages/X
+  const locRelImport = `../pages/${pageFileName}`;
+  const pageRelImport = `../../pages/${pageFileName}`;
+
+  // ── Phase 1: Generate locators for elements mentioned in the scenario ────
+  const elementList = elements.length > 0
+    ? `The test scenario needs these elements: ${elements.join(", ")}.
+Only generate locators for these specific elements. Do NOT add extra locators.`
+    : "Include locators for all interactive elements the page likely has.";
+
+  const locPrompt = `You are generating a Cypress locators file for a page.
+Page description: ${description}${options.url ? `\nURL: ${options.url}` : ""}
+
+Here is the test scenario that the locators must support:
+${scenario}
+
+${elementList}
+
+Write a TypeScript constants file. Use these exact export names:
+- Export const name: ${locConstName}
+- File path: ${locRelPath}
+
+The constant MUST be flat (no nesting). Each field is a top-level key in UPPER_SNAKE_CASE (e.g. SEARCH_INPUT, not SearchInput).
+Each field has a JSDoc comment. Field values are plain strings: CSS selector (e.g. "[formcontrolname='kind']") or data-cy value (e.g. "login").
+Suffix with "as const" and export a type: export type ${pageName}Locators = typeof ${locConstName};
+
+Example structure (flat, no nesting):
+  export const ${locConstName} = {
+    /** description */
+    SEARCH_INPUT: "selector",
+    /** description */
+    SEARCH_BUTTON: "selector",
+  } as const;
+
+  export type ${pageName}Locators = typeof ${locConstName};`;
+
+  const locContent = await askLlm(provider, locPrompt, systemPrompt);
+
+  const absLocPath = writeArtifact(options.projectRoot, locRelPath, locContent);
+
+  // ── Phase 2: Generate page object with methods that match the scenario ───
+  const pageClassName = `${pageName}Page`.replace(/PagePage$/, "Page");
+  const pageSingletonName = camelCase(pageClassName);
+  const locToPageImport = `../locators/${locFileName}`;
+
+  const pagePrompt = `You are generating a Cypress Page Object class in TypeScript.
+Page description: ${description}${options.url ? `\nURL: ${options.url}` : ""}
+
+Here is the test scenario this Page Object must support:
+${scenario}
+
+Use these exact import and export names:
+- Import locators from: "${locToPageImport}"
+- The locators export const is: ${locConstName}
+- Class name: ${pageClassName}
+- Singleton export: export const ${pageSingletonName} = new ${pageClassName}()
+- File path: ${pageRelPath}
+
+Each method returns Cypress.Chainable<JQuery<HTMLElement>> (or <JQuery<void>> for .click()).
+Use cy.get(LOCATORS.FIELD_NAME) for CSS selectors, cy.getByCy(LOCATORS.FIELD_NAME) for data-cy.
+The LOCATORS object is flat (top-level keys only) — do NOT use nested access like LOCATORS.Section.Field.
+Add JSDoc comments on each method.
+Do NOT chain methods (return this) for individual actions — return the Cypress chain instead.
+Only use chaining in combined action methods.
+
+IMPORTANT: Create methods that exactly match the steps in the scenario above.
+For example, if the scenario says:
+  1. **Type** "car" into **search input**
+  2. **Click** **search button**
+Then the page MUST have methods: typeInSearchInput(value), clickSearchButton().`;
+
+  const pageContent = await askLlm(provider, pagePrompt, systemPrompt);
+
+  const absPagePath = writeArtifact(options.projectRoot, pageRelPath, pageContent);
+
+  // ── Phase 3: Generate test spec that implements the scenario ──────────────
+  const testPrompt = `You are generating a Cypress test spec file in TypeScript.
+
+Use these exact import names:
+- Import the page singleton from: "${pageRelImport}"
+- Import name: import { ${pageSingletonName} } from "${pageRelImport}";
+
+Here is the exact scenario to implement:
+${scenario}
+
+Write describe/it blocks (no tags metadata) with ${options.tier === "regression" ? "regression" : "smoke"} tests.
+Call page methods in the same order as the scenario steps.
+Use page methods for all interactions. Do NOT use cy.getByCy or cy.get directly.`;
+
+  const testContent = await askLlm(provider, testPrompt, systemPrompt);
+
+  const absTestPath = writeArtifact(options.projectRoot, testRelPath, testContent);
 
   const summary = `# Generated artifacts for: ${description}
+
+## Scenario
+${scenario}
 
 ## Locators
 ${absLocPath}
@@ -479,6 +569,38 @@ Generate ONE Cypress.Commands.add() call only. Do NOT wrap Section 1 in code fen
     paths: [commandsPath, dtsPath],
     content: `${commandCode}\n\n${typeEntry}`,
   };
+}
+
+export async function generateScenario(
+  description: string,
+  options: { projectRoot: string; provider?: LLMProvider; guide?: string },
+): Promise<string> {
+  const provider = options.provider ?? getActiveProvider();
+  const guideCtx = loadGuideContext(options.guide, options.projectRoot);
+  const systemPrompt = buildSystemPrompt(guideCtx);
+
+  const prompt = `You are planning a Cypress test scenario step by step.
+
+Goal: ${description}
+
+Output a test scenario in Markdown format. Each step uses **Action** and **Element** in bold.
+Follow this format exactly:
+
+## Scenario: <title>
+
+1. **Visit** <page>
+2. **Type** "<value>" into **<element>**
+3. **Click** **<element>**
+4. **Assert** **<element>** are visible
+
+Rules:
+- Actions: Visit, Type, Click, Assert, Select, Check, Uncheck, Hover, Scroll, Wait
+- Put action and element in **bold**
+- Put typed values in "double quotes"
+- Keep steps concise and focused on test flow
+- Do NOT include code fences or extra commentary`;
+
+  return await askLlm(provider, prompt, systemPrompt);
 }
 
 export const _internal = { stripCodeFences, writeArtifact, QA_SYSTEM_PROMPT };
