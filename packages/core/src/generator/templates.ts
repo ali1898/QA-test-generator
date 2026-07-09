@@ -215,69 +215,33 @@ export function supportE2e(o: ScaffoldOptions): FileSpec {
   const content = isTs(o)
     ? `import "./commands";
 import '@shelex/cypress-allure-plugin';
-import { resetApiEntries, addApiEntry, getApiEntries } from "./commands";
+import { setupApiLogging, attachApiLogsToAllure, clearApiLogs } from "./api-logger";
 
 beforeEach(() => {
-  resetApiEntries();
-  cy.intercept(/\\/api\\//, (req) => {
-    req.continue((res) => {
-      addApiEntry({
-        method: req.method,
-        url: req.url,
-        requestBody: req.body,
-        responseBody: res.body,
-        statusCode: res.statusCode,
-        duration: res.duration,
-        timestamp: new Date().toISOString(),
-      });
-    });
-  });
+  setupApiLogging();
 });
 
 afterEach(function () {
   if (this.currentTest?.state === "failed") {
-    const entries = getApiEntries();
-    if (entries.length > 0) {
-      cy.allure().attachment(
-        "API Calls (before failure)",
-        JSON.stringify(entries, null, 2),
-        "application/json"
-      );
-    }
+    attachApiLogsToAllure();
+  } else {
+    clearApiLogs();
   }
 });
 `
     : `require("./commands");
 require("@shelex/cypress-allure-plugin");
-const { resetApiEntries, addApiEntry, getApiEntries } = require("./commands");
+const { setupApiLogging, attachApiLogsToAllure, clearApiLogs } = require("./api-logger");
 
 beforeEach(() => {
-  resetApiEntries();
-  cy.intercept(/\\/api\\//, (req) => {
-    req.continue((res) => {
-      addApiEntry({
-        method: req.method,
-        url: req.url,
-        requestBody: req.body,
-        responseBody: res.body,
-        statusCode: res.statusCode,
-        duration: res.duration,
-        timestamp: new Date().toISOString(),
-      });
-    });
-  });
+  setupApiLogging();
 });
 
 afterEach(function () {
   if (this.currentTest?.state === "failed") {
-    const entries = getApiEntries();
-    if (entries.length > 0) {
-      cy.allure().attachment(
-        "API Calls (before failure)",
-        JSON.stringify(entries, null, 2),
-        "application/json"
-      );
-    }
+    attachApiLogsToAllure();
+  } else {
+    clearApiLogs();
   }
 });
 `;
@@ -296,20 +260,48 @@ Cypress.Commands.add("getByCy", (value: string) => {
   return cy.get(\`[data-cy="\${value}"]\`);
 });
 
-// ── API call tracking for Allure attachments ──────────────────────────────────
-const apiEntries: Array<Record<string, unknown>> = [];
+// ── API logger commands ───────────────────────────────────────────────────────
+// Use "qa generate command" to create more commands with AI.
 
-export function resetApiEntries(): void {
-  apiEntries.length = 0;
+import { setupApiLogging, attachApiLogsToAllure, clearApiLogs, getApiLogs } from "./api-logger";
+
+declare global {
+  namespace Cypress {
+    interface Chainable {
+      getByCy(value: string): Chainable<JQuery<HTMLElement>>;
+      setupApiLogging(): Chainable<void>;
+      attachApiLogsToAllure(): Chainable<void>;
+      clearApiLogs(): Chainable<void>;
+      getApiLogs(): Chainable<ReadonlyArray<import("./api-logger").ApiCallLog>>;
+      watchApiErrors(): Chainable<void>;
+    }
+  }
 }
 
-export function addApiEntry(entry: Record<string, unknown>): void {
-  apiEntries.push(entry);
-}
+Cypress.Commands.add("setupApiLogging", () => {
+  setupApiLogging();
+});
 
-export function getApiEntries(): Array<Record<string, unknown>> {
-  return [...apiEntries];
-}
+Cypress.Commands.add("attachApiLogsToAllure", () => {
+  attachApiLogsToAllure();
+});
+
+Cypress.Commands.add("clearApiLogs", () => {
+  clearApiLogs();
+});
+
+Cypress.Commands.add("getApiLogs", () => {
+  return cy.wrap(getApiLogs(), { log: false });
+});
+
+Cypress.Commands.add("watchApiErrors", () => {
+  cy.on("fail", (err) => {
+    if (err.message?.includes("500") || err.message?.includes("502") || err.message?.includes("503")) {
+      attachApiLogsToAllure();
+    }
+    throw err;
+  });
+});
 `;
     return { path: `cypress/support/commands.${e}`, content };
   } else {
@@ -320,20 +312,35 @@ Cypress.Commands.add("getByCy", (value) => {
   return cy.get(\`[data-cy="\${value}"]\`);
 });
 
-// ── API call tracking for Allure attachments ──────────────────────────────────
-const apiEntries = [];
+// ── API logger commands ───────────────────────────────────────────────────────
+// Use "qa generate command" to create more commands with AI.
 
-export function resetApiEntries() {
-  apiEntries.length = 0;
-}
+const { setupApiLogging, attachApiLogsToAllure, clearApiLogs, getApiLogs } = require("./api-logger");
 
-export function addApiEntry(entry) {
-  apiEntries.push(entry);
-}
+Cypress.Commands.add("setupApiLogging", () => {
+  setupApiLogging();
+});
 
-export function getApiEntries() {
-  return [...apiEntries];
-}
+Cypress.Commands.add("attachApiLogsToAllure", () => {
+  attachApiLogsToAllure();
+});
+
+Cypress.Commands.add("clearApiLogs", () => {
+  clearApiLogs();
+});
+
+Cypress.Commands.add("getApiLogs", () => {
+  return cy.wrap(getApiLogs(), { log: false });
+});
+
+Cypress.Commands.add("watchApiErrors", () => {
+  cy.on("fail", (err) => {
+    if (err.message?.includes("500") || err.message?.includes("502") || err.message?.includes("503")) {
+      attachApiLogsToAllure();
+    }
+    throw err;
+  });
+});
 `;
     return { path: `cypress/support/commands.${e}`, content };
   }
@@ -374,6 +381,556 @@ export interface UsersData {
 }
 `;
   return { path: "cypress/support/types/usersJson.d.ts", content };
+}
+
+export function supportApiLogger(_o: ScaffoldOptions): FileSpec {
+  const content = `/**
+ * API Call Logger for Cypress Allure Reports
+ * Captures API requests/responses and attaches them to Allure reports on test failure.
+ */
+
+interface ApiRequestLog {
+  method: string;
+  url: string;
+  headers: Record<string, string>;
+  body: unknown;
+}
+
+interface ApiResponseLog {
+  statusCode: number;
+  statusMessage: string;
+  headers: Record<string, string>;
+  body: unknown;
+  duration: number;
+}
+
+interface ApiCallLog {
+  request: ApiRequestLog;
+  response: ApiResponseLog;
+  timestamp: number;
+}
+
+const MAX_RESPONSE_BODY_LENGTH = 1000;
+const MAX_STORED_CALLS = 50;
+
+let apiCalls: ApiCallLog[] = [];
+let wasAttachedInCurrentTest = false;
+
+function truncateBody(body: unknown): unknown {
+  if (body === null || body === undefined) return body;
+
+  if (typeof body === "string") {
+    if (body.length > MAX_RESPONSE_BODY_LENGTH) {
+      return body.substring(0, MAX_RESPONSE_BODY_LENGTH) + "... [truncated]";
+    }
+    return body;
+  }
+
+  if (typeof body === "object") {
+    try {
+      const str = JSON.stringify(body);
+      if (str.length > MAX_RESPONSE_BODY_LENGTH) {
+        return str.substring(0, MAX_RESPONSE_BODY_LENGTH) + "... [truncated]";
+      }
+      return body;
+    } catch {
+      return String(body).substring(0, MAX_RESPONSE_BODY_LENGTH) + "... [truncated]";
+    }
+  }
+
+  return body;
+}
+
+function isApiUrl(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return u.pathname.includes("/api/") && u.hostname !== "localhost" && u.hostname !== "127.0.0.1";
+  } catch {
+    return url.includes("/api/") && !url.includes("localhost");
+  }
+}
+
+function sanitizeHeaders(headers: Record<string, string | string[]>): Record<string, string> {
+  const sanitized: Record<string, string> = {};
+  const sensitiveKeys = [
+    "cookie",
+    "set-cookie",
+    "x-api-key",
+    "api-key",
+    "token",
+    "access-token",
+    "refresh-token",
+    "secret",
+  ];
+
+  for (const [key, value] of Object.entries(headers)) {
+    const val = Array.isArray(value) ? value.join(", ") : String(value);
+    const isSensitive = sensitiveKeys.some((sk) => key.toLowerCase().includes(sk));
+    sanitized[key] = isSensitive ? "***" : val;
+  }
+
+  return sanitized;
+}
+
+function getStatusCategory(
+  statusCode: number,
+): "success" | "redirect" | "client_error" | "server_error" | "unknown" {
+  if (statusCode >= 200 && statusCode < 300) return "success";
+  if (statusCode >= 300 && statusCode < 400) return "redirect";
+  if (statusCode >= 400 && statusCode < 500) return "client_error";
+  if (statusCode >= 500) return "server_error";
+  return "unknown";
+}
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "\x26amp;")
+    .replace(/</g, "\x26lt;")
+    .replace(/>/g, "\x26gt;")
+    .replace(/"/g, "\x26quot;")
+    .replace(/'/g, "\x26#039;");
+}
+
+function safePrettyBody(body: unknown): unknown {
+  if (body === null || body === undefined) return "(empty)";
+
+  if (typeof body === "string") {
+    try {
+      return JSON.parse(body);
+    } catch {
+      return body;
+    }
+  }
+
+  return body;
+}
+
+function formatJsonBlock(data: unknown): string {
+  const pretty = typeof data === "string" ? data : JSON.stringify(data, null, 2);
+
+  return \`<pre class="json-block"><code>\${escapeHtml(pretty)}</code></pre>\`;
+}
+
+function getMethodClass(method: string): string {
+  return \`method-\${method.toLowerCase()}\`;
+}
+
+function getStatusClass(statusCode: number): string {
+  if (statusCode >= 200 && statusCode < 300) return "status-success";
+  if (statusCode >= 300 && statusCode < 400) return "status-redirect";
+  if (statusCode >= 400 && statusCode < 500) return "status-client-error";
+  if (statusCode >= 500) return "status-server-error";
+  return "status-unknown";
+}
+
+function formatApiCallsForHtmlReport(calls: ApiCallLog[]): string {
+  const total = calls.length;
+  const success = calls.filter((c) => c.response.statusCode >= 200 && c.response.statusCode < 300).length;
+  const clientErrors = calls.filter((c) => c.response.statusCode >= 400 && c.response.statusCode < 500).length;
+  const serverErrors = calls.filter((c) => c.response.statusCode >= 500).length;
+  const redirects = calls.filter((c) => c.response.statusCode >= 300 && c.response.statusCode < 400).length;
+
+  const itemsHtml = calls
+    .map((call, index) => {
+      const statusClass = getStatusClass(call.response.statusCode);
+      const methodClass = getMethodClass(call.request.method);
+      const isFailed = call.response.statusCode >= 400;
+      const isSlow = call.response.duration >= 2000;
+
+      return \`
+        <details class="api-card \${isFailed ? "failed" : "passed"} \${isSlow ? "slow" : ""}">
+          <summary class="api-summary">
+            <span class="badge method \${methodClass}">\${escapeHtml(call.request.method)}</span>
+            <span class="url">\${escapeHtml(call.request.url)}</span>
+            <span class="badge status \${statusClass}">
+              \${call.response.statusCode} \${escapeHtml(call.response.statusMessage || "")}
+            </span>
+            <span class="badge duration">\${call.response.duration} ms</span>
+          </summary>
+
+          <div class="api-body">
+            <div class="section">
+              <div class="section-title">Request</div>
+              <div class="kv"><span class="k">Method:</span> <span class="v">\${escapeHtml(call.request.method)}</span></div>
+              <div class="kv"><span class="k">URL:</span> <span class="v mono">\${escapeHtml(call.request.url)}</span></div>
+
+              <div class="sub-title">Headers</div>
+              \${formatJsonBlock(call.request.headers)}
+
+              <div class="sub-title">Body</div>
+              \${formatJsonBlock(safePrettyBody(call.request.body))}
+            </div>
+
+            <div class="section">
+              <div class="section-title">Response</div>
+              <div class="kv"><span class="k">Status Code:</span> <span class="v">\${call.response.statusCode}</span></div>
+              <div class="kv"><span class="k">Status Message:</span> <span class="v">\${escapeHtml(call.response.statusMessage || "")}</span></div>
+              <div class="kv"><span class="k">Category:</span> <span class="v">\${getStatusCategory(call.response.statusCode)}</span></div>
+              <div class="kv"><span class="k">Duration:</span> <span class="v">\${call.response.duration} ms</span></div>
+
+              <div class="sub-title">Headers</div>
+              \${formatJsonBlock(call.response.headers)}
+
+              <div class="sub-title">Body</div>
+              \${formatJsonBlock(safePrettyBody(call.response.body))}
+            </div>
+          </div>
+        </details>
+      \`;
+    })
+    .join("");
+
+  return \`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>API Calls Log</title>
+  <style>
+    :root {
+      --bg: #f6f8fb;
+      --card: #ffffff;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --border: #e5e7eb;
+      --shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+      --success: #16a34a;
+      --redirect: #d97706;
+      --client: #dc2626;
+      --server: #b91c1c;
+      --unknown: #64748b;
+      --blue: #2563eb;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 24px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      margin: 0 0 16px;
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      margin-bottom: 24px;
+      font-size: 13px;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .summary-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+      padding: 16px;
+    }
+
+    .summary-label {
+      font-size: 12px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      margin-bottom: 8px;
+      font-weight: 700;
+    }
+
+    .summary-value {
+      font-size: 28px;
+      font-weight: 800;
+      line-height: 1;
+    }
+
+    .summary-card.total { border-top: 4px solid var(--blue); }
+    .summary-card.success { border-top: 4px solid var(--success); }
+    .summary-card.redirect { border-top: 4px solid var(--redirect); }
+    .summary-card.client { border-top: 4px solid var(--client); }
+    .summary-card.server { border-top: 4px solid var(--server); }
+
+    .api-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+
+    .api-card[open] .api-summary {
+      border-bottom: 1px solid var(--border);
+    }
+
+    .api-summary {
+      list-style: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 16px;
+      background: linear-gradient(180deg, #fff, #fbfdff);
+    }
+
+    .api-summary::-webkit-details-marker { display: none; }
+
+    .url {
+      flex: 1;
+      min-width: 0;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size: 12px;
+      color: #111827;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      padding: 5px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      white-space: nowrap;
+      border: 1px solid transparent;
+    }
+
+    .method-get { background: #dcfce7; color: #166534; }
+    .method-post { background: #dbeafe; color: #1d4ed8; }
+    .method-put { background: #ffedd5; color: #c2410c; }
+    .method-patch { background: #ede9fe; color: #6d28d9; }
+    .method-delete { background: #fee2e2; color: #991b1b; }
+    .method-head,
+    .method-options { background: #e2e8f0; color: #334155; }
+
+    .status-success { background: #dcfce7; color: #166534; }
+    .status-redirect { background: #fef3c7; color: #92400e; }
+    .status-client-error { background: #fee2e2; color: #991b1b; }
+    .status-server-error { background: #fecaca; color: #7f1d1d; }
+    .status-unknown { background: #e2e8f0; color: #334155; }
+
+    .duration {
+      background: #f3f4f6;
+      color: #374151;
+    }
+
+    .api-body {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      padding: 16px;
+    }
+
+    .section {
+      background: #f9fafb;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      min-width: 0;
+    }
+
+    .section-title {
+      font-size: 14px;
+      font-weight: 800;
+      margin-bottom: 12px;
+    }
+
+    .sub-title {
+      margin: 14px 0 8px;
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+
+    .kv {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 6px;
+      font-size: 13px;
+      align-items: flex-start;
+    }
+
+    .k {
+      color: var(--muted);
+      min-width: 110px;
+      flex: 0 0 auto;
+      font-weight: 700;
+    }
+
+    .v {
+      flex: 1;
+      word-break: break-word;
+    }
+
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size: 12px;
+    }
+
+    .json-block {
+      margin: 0;
+      background: #0f172a;
+      color: #e2e8f0;
+      border-radius: 10px;
+      padding: 12px;
+      overflow: auto;
+      max-height: 360px;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .json-block code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      white-space: pre;
+    }
+
+    .failed {
+      box-shadow: 0 8px 24px rgba(220, 38, 38, 0.06);
+    }
+
+    .slow .api-summary {
+      background: #fffaf0;
+    }
+
+    @media (max-width: 1100px) {
+      .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .api-body { grid-template-columns: 1fr; }
+      .api-summary { flex-wrap: wrap; }
+      .url { order: 3; width: 100%; flex-basis: 100%; white-space: normal; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>API Calls Log</h1>
+    <div class="subtitle">Generated at \${escapeHtml(new Date().toISOString())}</div>
+
+    <div class="summary-grid">
+      <div class="summary-card total">
+        <div class="summary-label">Total Calls</div>
+        <div class="summary-value">\${total}</div>
+      </div>
+      <div class="summary-card success">
+        <div class="summary-label">Success (2xx)</div>
+        <div class="summary-value">\${success}</div>
+      </div>
+      <div class="summary-card redirect">
+        <div class="summary-label">Redirect (3xx)</div>
+        <div class="summary-value">\${redirects}</div>
+      </div>
+      <div class="summary-card client">
+        <div class="summary-label">Client Errors (4xx)</div>
+        <div class="summary-value">\${clientErrors}</div>
+      </div>
+      <div class="summary-card server">
+        <div class="summary-label">Server Errors (5xx)</div>
+        <div class="summary-value">\${serverErrors}</div>
+      </div>
+    </div>
+
+    <div class="api-list">
+      \${itemsHtml || \`<div class="summary-card">No API calls captured.</div>\`}
+    </div>
+  </div>
+</body>
+</html>
+\`;
+}
+
+export function setupApiLogging(): void {
+  apiCalls = [];
+  wasAttachedInCurrentTest = false;
+
+  cy.intercept("**/api/**", (req) => {
+    if (!isApiUrl(req.url)) return;
+
+    const startTime = Date.now();
+
+    req.continue((res) => {
+      try {
+        const duration = Date.now() - startTime;
+
+        const safeReqHeaders = sanitizeHeaders(req.headers);
+        const safeResHeaders = sanitizeHeaders(res.headers);
+
+        apiCalls.push({
+          request: {
+            method: req.method,
+            url: req.url,
+            headers: safeReqHeaders,
+            body: truncateBody(req.body),
+          },
+          response: {
+            statusCode: res.statusCode,
+            statusMessage: res.statusMessage || "",
+            headers: safeResHeaders,
+            body: truncateBody(res.body),
+            duration,
+          },
+          timestamp: startTime,
+        });
+
+        if (apiCalls.length > MAX_STORED_CALLS) {
+          apiCalls.shift();
+        }
+      } catch {
+        // Silently ignore capture errors to not break tests
+      }
+    });
+  });
+}
+
+export function attachApiLogsToAllure(): void {
+  if (apiCalls.length === 0 || wasAttachedInCurrentTest) return;
+
+  wasAttachedInCurrentTest = true;
+  const html = formatApiCallsForHtmlReport(apiCalls);
+  clearApiLogs();
+
+  const timestamp = Date.now();
+  const filePath = \`allure-report/API-LOGS/api-call-logs-\${timestamp}.html\`;
+
+  cy.writeFile(filePath, html, "utf8").then(() => {
+    cy.allure().fileAttachment("API Calls Log", filePath, "text/html");
+  });
+}
+
+export function clearApiLogs(): void {
+  apiCalls = [];
+  wasAttachedInCurrentTest = false;
+}
+
+export function getApiLogs(): ReadonlyArray<ApiCallLog> {
+  return apiCalls;
+}
+
+export type { ApiCallLog, ApiRequestLog, ApiResponseLog };
+`;
+  return { path: "cypress/support/api-logger.ts", content };
 }
 
 export function locators(o: ScaffoldOptions): FileSpec {
@@ -474,7 +1031,7 @@ export class LoginPage {
   /**
    * visit page
    */
-  openLoginPage(): Cypress.Chainable<JQuery<HTMLElement>> {
+  openLoginPage(): Cypress.Chainable<Cypress.AUTWindow> {
     return cy.visit("/");
   }
 
