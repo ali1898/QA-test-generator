@@ -202,6 +202,11 @@ qa scenario -g "checkout with coupon"
 - **Fix**: Changed to `node serve.js` in both shell and cmd templates.
 - **File**: `packages/core/src/generator/templates.ts` lines 1783, 1791
 
+### BDD Step-Definition Method Names
+- **Problem**: Generated step-definitions used incorrect method names from the LoginPage class (e.g., `visit()`, `fillUsername()`, `fillPassword()`, `clickLogin()`, `getErrorMessage()`).
+- **Fix**: Updated step-definition templates to use correct LoginPage method names: `openLoginPage()`, `enterUserNameInput()`, `enterPasswordInput()`, `clickLoginButton()`, and direct locator access for error message.
+- **File**: `packages/core/src/generator/templates.ts` (sampleStepsTs, sampleStepsJs functions)
+
 ## Generated Project Structure
 
 The output of `qa new` produces a Cypress project with:
