@@ -80,7 +80,8 @@ export async function analyzeCommand(opts: AnalyzeOptions): Promise<void> {
     const useAuth = await confirm({ message: "Does this page require authentication?", default: false });
     if (useAuth) {
       auth = {};
-      auth.loginUrl = await promptOptional("Login page URL (e.g. 'http://localhost:3000/login'):");
+      console.log(chalk.hex("#feca57")("  Note: Provide the exact login page URL (e.g., 'http://site.com/login', not the site root)"));
+      auth.loginUrl = await promptOptional("Login page URL (where username/password fields are):");
       if (auth.loginUrl) {
         auth.username = await promptOptional("Username/email:");
         if (auth.username) {
