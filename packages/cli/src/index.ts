@@ -42,7 +42,7 @@ ${chalk.bold.hex("#feca57")("⚡ Commands")}
 
   ${chalk.bold("qa new")}                ${chalk.dim("Scaffold a complete Cypress project (POM + BDD + Allure + scenarios)")}
   ${chalk.bold("qa generate")} / ${chalk.bold("qa g")}  ${chalk.dim("Generate with AI (test|page|locators|helper|command|bdd|all — supports --url, --guide, --tier, --scenario, --scenario-file, --name, --yes)")}
-  ${chalk.bold("qa analyze")}            ${chalk.dim("Analyze a web page and generate locators/page/test (interactive or --url, --name, --tier, --yes)")}
+  ${chalk.bold("qa analyze")}            ${chalk.dim("Analyze a web page & generate locators/page/test (interactive or --url, --name, --tier, --yes, --login-url, --username, --password, --scenario-output)")}
   ${chalk.bold("qa generate-guide")} / ${chalk.bold("qa gg")}  ${chalk.dim("Create a Structure Guide (interactive or --project-root, --output, --yes)")}
   ${chalk.bold("qa chat")}               ${chalk.dim("Interactive QA assistant (supports --guide for context)")}
   ${chalk.bold("qa docs")}               ${chalk.dim("Generate Markdown/HTML docs (interactive or --project-root, --output, --yes, --confluence)")}
@@ -80,6 +80,21 @@ ${chalk.bold.hex("#48dbfb")("📦 Examples")}
   $ qa analyze -u "https://example.com/login" -n "LoginPage"
   $ qa analyze --url "http://localhost:3000/checkout" --tier regression
   $ qa analyze                           ${chalk.dim("(interactive)")}
+
+  ${chalk.dim("# — Analyze pages requiring authentication —")}
+  $ qa analyze -u "https://app.example.com/dashboard" \\
+      --login-url "https://app.example.com/login" \\
+      --username "admin" --password "secret" \\
+      --wait-for-selector ".dashboard-header" \\
+      --scenario-output "scenarios/dashboard.md" -y
+
+  ${chalk.dim("# — Full workflow: analyze \u2192 scenario \u2192 generate —")}
+  $ qa analyze -u "https://app.example.com/checkout" \\
+      --login-url "https://app.example.com/login" \\
+      --username "user" --password "pass" \\
+      --scenario-output "scenarios/checkout.md" -y
+  ${chalk.dim("#   (edit scenarios/checkout.md if needed)")}
+  $ qa g all --scenario-file scenarios/checkout.md --name "CheckoutPage" -y
 
   ${chalk.dim("# — Learn from existing projects —")}
   $ qa gg                       ${chalk.dim("(interactive)")}
