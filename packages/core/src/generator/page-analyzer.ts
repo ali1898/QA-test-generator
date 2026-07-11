@@ -75,6 +75,31 @@ export interface PageAnalysis {
   textareas: PageElement[];
 }
 
+export interface AuthOptions {
+  /** URL to navigate to first for login */
+  loginUrl?: string;
+  /** Username/email for login */
+  username?: string;
+  /** Password for login */
+  password?: string;
+  /** Username/email field selector */
+  usernameSelector?: string;
+  /** Password field selector */
+  passwordSelector?: string;
+  /** Login button selector */
+  loginButtonSelector?: string;
+  /** Wait for this selector after login (e.g., dashboard element) */
+  waitForSelector?: string;
+  /** Additional cookies to set before navigation */
+  cookies?: Array<{ name: string; value: string; domain?: string; path?: string }>;
+  /** LocalStorage items to set */
+  localStorage?: Record<string, string>;
+  /** SessionStorage items to set */
+  sessionStorage?: Record<string, string>;
+  /** Custom authentication function */
+  customAuth?: (page: Page) => Promise<void>;
+}
+
 interface GuideContext {
   meta: StructureMeta;
   markdown: string;
@@ -278,7 +303,63 @@ async function getFormSelector(form: ElementHandle): Promise<string> {
   return "form";
 }
 
-async function analyzePage(url: string): Promise<PageAnalysis> {
+async function performAuthentication(page: Page, auth: AuthOptions): Promise<void> {
+  // Set cookies if provided
+  if (auth.cookies && auth.cookies.length > 0) {
+    await page.context().addCookies(auth.cookies.map((c) => ({
+      name: c.name,
+      value: c.value,
+      domain: c.domain,
+      path: c.path || "/",
+    })));
+  }
+
+  // Set localStorage if provided
+  if (auth.localStorage) {
+    await page.evaluate((storage) => {
+      Object.entries(storage).forEach(([key, value]) => {
+        (globalThis as any).localStorage.setItem(key, value);
+      });
+    }, auth.localStorage);
+  }
+
+  // Set sessionStorage if provided
+  if (auth.sessionStorage) {
+    await page.evaluate((storage) => {
+      Object.entries(storage).forEach(([key, value]) => {
+        (globalThis as any).sessionStorage.setItem(key, value);
+      });
+    }, auth.sessionStorage);
+  }
+
+  // Custom auth function
+  if (auth.customAuth) {
+    await auth.customAuth(page);
+    return;
+  }
+
+  // Form-based login
+  if (auth.loginUrl && auth.username && auth.password) {
+    await page.goto(auth.loginUrl, { waitUntil: "networkidle", timeout: 60000 });
+
+    const userSelector = auth.usernameSelector || 'input[type="email"], input[name*="user" i], input[name*="email" i], input[id*="user" i], #username, #email';
+    const passSelector = auth.passwordSelector || 'input[type="password"], input[name*="pass" i], #password';
+    const btnSelector = auth.loginButtonSelector || 'button[type="submit"], input[type="submit"], button:has-text("Login"), button:has-text("Sign in"), button:has-text("ورود")';
+
+    await page.waitForSelector(userSelector, { timeout: 10000 });
+    await page.fill(userSelector, auth.username);
+    await page.fill(passSelector, auth.password);
+    await page.click(btnSelector);
+
+    if (auth.waitForSelector) {
+      await page.waitForSelector(auth.waitForSelector, { timeout: 15000 });
+    } else {
+      await page.waitForLoadState("networkidle");
+    }
+  }
+}
+
+async function analyzePage(url: string, auth?: AuthOptions): Promise<PageAnalysis> {
   let browser: Browser | null = null;
   try {
     browser = await chromium.launch({ headless: true, executablePath: CHROMIUM_PATH });
@@ -287,6 +368,11 @@ async function analyzePage(url: string): Promise<PageAnalysis> {
       userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
     });
     const page = await context.newPage();
+
+    // Handle authentication if provided
+    if (auth) {
+      await performAuthentication(page, auth);
+    }
 
     await page.goto(url, { waitUntil: "networkidle", timeout: 60000 });
     await page.waitForLoadState("domcontentloaded");
@@ -503,6 +589,7 @@ export async function analyzeAndGenerate(
     guide?: string;
     name?: string;
     tier?: "smoke" | "regression";
+    auth?: AuthOptions;
   }
 ): Promise<{ paths: string[]; analysis: PageAnalysis }> {
   const provider = options.provider ?? getActiveProvider();
@@ -510,7 +597,7 @@ export async function analyzeAndGenerate(
   const systemPrompt = buildSystemPrompt(guideCtx);
 
   console.log(`[qa] Analyzing page: ${url}`);
-  const analysis = await analyzePage(url);
+  const analysis = await analyzePage(url, options.auth);
 
   const namingSource = options.name || analysis.title || "page";
   const baseName = sanitizeName(namingSource);
@@ -548,5 +635,57 @@ export async function analyzeAndGenerate(
   return { paths: [absLocPath, absPagePath, absTestPath], analysis };
 }
 
-export { analyzePage, generateLocatorsContent, generatePageContent, generateTestContent };
+function generateScenarioFromAnalysis(analysis: PageAnalysis, pageName: string): string {
+  const lines: string[] = [];
+  lines.push(`# Scenario: ${pageName}`);
+  lines.push(``);
+
+  let stepNum = 1;
+
+  lines.push(`${stepNum++}. **Visit** ${analysis.url}`);
+  lines.push(``);
+
+  if (analysis.forms.length > 0) {
+    for (const form of analysis.forms) {
+      for (const el of form.elements) {
+        if (el.tag === "input" && el.type === "password") {
+          lines.push(`${stepNum++}. **Type** "****" into **${el.name || el.id || el.placeholder || "password field"}**`);
+        } else if (el.tag === "input" && el.type && !["button", "submit", "checkbox", "radio"].includes(el.type)) {
+          lines.push(`${stepNum++}. **Type** "<value>" into **${el.name || el.id || el.placeholder || "input field"}**`);
+        } else if (el.tag === "select") {
+          lines.push(`${stepNum++}. **Select** "<option>" from **${el.name || el.id || "dropdown"}**`);
+        } else if (el.tag === "input" && el.type === "checkbox") {
+          lines.push(`${stepNum++}. **Check** **${el.name || el.id || "checkbox"}**`);
+        } else if (el.tag === "input" && el.type === "radio") {
+          lines.push(`${stepNum++}. **Select** **${el.value || el.name || el.id || "radio option"}**`);
+        } else if (el.tag === "textarea") {
+          lines.push(`${stepNum++}. **Type** "<text>" into **${el.name || el.id || el.placeholder || "textarea"}**`);
+        } else if (el.tag === "button" || (el.tag === "input" && ["button", "submit"].includes(el.type || ""))) {
+          lines.push(`${stepNum++}. **Click** **${el.text || el.value || el.id || "button"}**`);
+        }
+      }
+    }
+  }
+
+  for (const el of analysis.buttons) {
+    if (!analysis.forms.some(f => f.elements.some(fe => fe.selector === el.selector))) {
+      lines.push(`${stepNum++}. **Click** **${el.text || el.value || el.id || "button"}**`);
+    }
+  }
+  for (const el of analysis.links) {
+    lines.push(`${stepNum++}. **Click** **${el.text || "link"}**`);
+  }
+
+  lines.push(``);
+  lines.push(`## Expected Results`);
+  lines.push(`- Page loads successfully`);
+  if (analysis.forms.length > 0) {
+    lines.push(`- Form submission works correctly`);
+  }
+  lines.push(`- All interactive elements are visible and functional`);
+
+  return lines.join("\n");
+}
+
+export { analyzePage, generateLocatorsContent, generatePageContent, generateTestContent, generateScenarioFromAnalysis };
 export type { GuideContext };

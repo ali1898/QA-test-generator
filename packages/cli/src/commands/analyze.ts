@@ -1,6 +1,7 @@
-import { input } from "@inquirer/prompts";
-import { resolve } from "node:path";
-import { analyzePage, analyzeAndGenerate, type PageAnalysis } from "@qa-test-generator/core";
+import { input, select, confirm } from "@inquirer/prompts";
+import { resolve, dirname } from "node:path";
+import { writeFileSync, mkdirSync } from "node:fs";
+import { analyzePage, analyzeAndGenerate, generateScenarioFromAnalysis, type PageAnalysis, type AuthOptions } from "@qa-test-generator/core";
 import { ui, withSpinner, chalk } from "../ui";
 
 export interface AnalyzeOptions {
@@ -11,9 +12,24 @@ export interface AnalyzeOptions {
   tier?: "smoke" | "regression";
   yes?: boolean;
   output?: "all" | "locators" | "page" | "test" | "none";
+  // Auth options
+  loginUrl?: string;
+  username?: string;
+  password?: string;
+  usernameSelector?: string;
+  passwordSelector?: string;
+  loginButtonSelector?: string;
+  waitForSelector?: string;
+  // Scenario output
+  scenarioOutput?: string;
 }
 
 async function promptOptional(message: string): Promise<string> {
+  const value = await input({ message });
+  return value.trim();
+}
+
+async function promptPassword(message: string): Promise<string> {
   const value = await input({ message });
   return value.trim();
 }
@@ -44,6 +60,38 @@ export async function analyzeCommand(opts: AnalyzeOptions): Promise<void> {
     process.exit(1);
   }
 
+  // Authentication options
+  let auth: AuthOptions | undefined;
+  const needsAuth = opts.loginUrl || opts.username || opts.password || opts.yes === false;
+  
+  if (needsAuth && !opts.yes) {
+    const useAuth = await confirm({ message: "Does this page require authentication?", default: false });
+    if (useAuth) {
+      auth = {};
+      auth.loginUrl = await promptOptional("Login page URL (e.g. 'http://localhost:3000/login'):");
+      if (auth.loginUrl) {
+        auth.username = await promptOptional("Username/email:");
+        if (auth.username) {
+          auth.password = await promptPassword("Password:");
+        }
+        auth.usernameSelector = await promptOptional("Username field selector (optional, press Enter for auto-detect):") || undefined;
+        auth.passwordSelector = await promptOptional("Password field selector (optional, press Enter for auto-detect):") || undefined;
+        auth.loginButtonSelector = await promptOptional("Login button selector (optional, press Enter for auto-detect):") || undefined;
+        auth.waitForSelector = await promptOptional("Selector to wait for after login (e.g., dashboard element, optional):") || undefined;
+      }
+    }
+  } else if (opts.loginUrl || opts.username || opts.password) {
+    auth = {
+      loginUrl: opts.loginUrl,
+      username: opts.username,
+      password: opts.password,
+      usernameSelector: opts.usernameSelector,
+      passwordSelector: opts.passwordSelector,
+      loginButtonSelector: opts.loginButtonSelector,
+      waitForSelector: opts.waitForSelector,
+    };
+  }
+
   let name = opts.name;
   if (!name && !opts.yes) {
     name = await promptOptional("Override name for file/class naming (leave empty to derive from page title):");
@@ -51,22 +99,36 @@ export async function analyzeCommand(opts: AnalyzeOptions): Promise<void> {
 
   let tier = opts.tier;
   if (!tier && !opts.yes) {
-    const tierChoice = await input({
+    const tierChoice = await select<"smoke" | "regression">({
       message: "Test tier:",
+      choices: [
+        { name: "Smoke (default)", value: "smoke" },
+        { name: "Regression", value: "regression" },
+      ],
       default: "smoke",
     });
-    tier = tierChoice.toLowerCase() as "smoke" | "regression";
-    if (!["smoke", "regression"].includes(tier)) tier = "smoke";
+    tier = tierChoice;
   }
 
   const output = opts.output ?? "all";
 
+  // Scenario output option
+  let scenarioOutput = opts.scenarioOutput;
+  if (!scenarioOutput && !opts.yes && output !== "none") {
+    const saveScenario = await confirm({ message: "Save generated scenario to file for use with 'qa generate all'?", default: true });
+    if (saveScenario) {
+      scenarioOutput = await promptOptional("Scenario file path (e.g., 'scenarios/login.md'):") || "scenarios/analyzed-scenario.md";
+    }
+  }
+
   console.log();
   console.log(chalk.dim("  project:") + `  ${resolve(projectRoot)}`);
   console.log(chalk.dim("  url:") + `        ${url}`);
+  if (auth?.loginUrl) console.log(chalk.dim("  login:") + `       ${auth.loginUrl}`);
   if (name) console.log(chalk.dim("  name:") + `       ${name}`);
   if (tier) console.log(chalk.dim("  tier:") + `       ${tier}`);
   console.log(chalk.dim("  output:") + `     ${output}`);
+  if (scenarioOutput) console.log(chalk.dim("  scenario:") + `   ${scenarioOutput}`);
   console.log();
 
   try {
@@ -76,6 +138,7 @@ export async function analyzeCommand(opts: AnalyzeOptions): Promise<void> {
         name,
         guide: opts.guide,
         tier,
+        auth,
       });
     });
 
@@ -93,6 +156,16 @@ export async function analyzeCommand(opts: AnalyzeOptions): Promise<void> {
     if (output === "all" || output === "test") {
       const testPath = result.paths.find((p) => p.includes("test"));
       if (testPath) console.log(chalk.green("  ✔ ") + chalk.dim(testPath));
+    }
+
+    // Generate and save scenario if requested
+    if (scenarioOutput) {
+      const pageName = opts.name || result.analysis.title || "AnalyzedPage";
+      const scenario = generateScenarioFromAnalysis(result.analysis, pageName);
+      const fullPath = resolve(projectRoot, scenarioOutput);
+      mkdirSync(dirname(fullPath), { recursive: true });
+      writeFileSync(fullPath, scenario, "utf-8");
+      console.log(chalk.green("  ✔ ") + chalk.dim(fullPath) + chalk.hex("#feca57")(" (scenario)"));
     }
 
     console.log();
@@ -113,7 +186,12 @@ export async function analyzeCommand(opts: AnalyzeOptions): Promise<void> {
     console.log(chalk.hex("#feca57")("  💡 Next steps:"));
     console.log(chalk.dim("    1. Review generated locators in cypress/e2e/locators/"));
     console.log(chalk.dim("    2. Adjust selectors if needed (prefer data-cy attributes)"));
-    console.log(chalk.dim("    3. Run tests: npm run cy:smoke"));
+    if (scenarioOutput) {
+      console.log(chalk.dim(`    3. Edit scenario: ${scenarioOutput}`));
+      console.log(chalk.dim(`    4. Run: qa g all --scenario-file ${scenarioOutput} --name "YourPageName"`));
+    } else {
+      console.log(chalk.dim("    3. Run tests: npm run cy:smoke"));
+    }
     console.log();
   } catch (err) {
     ui.error(`Analysis failed: ${err instanceof Error ? err.message : String(err)}`);

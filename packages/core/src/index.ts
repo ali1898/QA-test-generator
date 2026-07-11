@@ -50,9 +50,11 @@ export {
 export {
   analyzePage,
   analyzeAndGenerate,
+  generateScenarioFromAnalysis,
   type PageAnalysis,
   type PageElement,
   type PageForm,
+  type AuthOptions,
 } from "./generator/page-analyzer";
 
 // ── Structure Guide ─────────────────────────────────────────────────────────

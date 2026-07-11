@@ -204,6 +204,14 @@ program
   .option("--guide <path>", "path to a Structure Guide markdown file for conventions")
   .option("--tier <tier>", "test tier: smoke (default) or regression")
   .option("--output <type>", "what to generate: all (default), locators, page, test, none")
+  .option("--login-url <url>", "login page URL (for pages requiring authentication)")
+  .option("--username <text>", "username/email for login")
+  .option("--password <text>", "password for login")
+  .option("--username-selector <selector>", "username field CSS selector")
+  .option("--password-selector <selector>", "password field CSS selector")
+  .option("--login-button-selector <selector>", "login button CSS selector")
+  .option("--wait-for-selector <selector>", "selector to wait for after login")
+  .option("--scenario-output <path>", "save generated scenario to file (e.g., 'scenarios/login.md')")
   .option("-y, --yes", "skip prompts, use defaults + provided flags")
   .action(async (opts) => {
     try {
@@ -215,6 +223,14 @@ program
         tier: opts.tier as "smoke" | "regression",
         output: opts.output as AnalyzeOptions["output"],
         yes: opts.yes,
+        loginUrl: opts.loginUrl,
+        username: opts.username,
+        password: opts.password,
+        usernameSelector: opts.usernameSelector,
+        passwordSelector: opts.passwordSelector,
+        loginButtonSelector: opts.loginButtonSelector,
+        waitForSelector: opts.waitForSelector,
+        scenarioOutput: opts.scenarioOutput,
       });
     } catch (err) {
       ui.error(err instanceof Error ? err.message : String(err));
