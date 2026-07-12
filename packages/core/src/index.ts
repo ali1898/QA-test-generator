@@ -57,6 +57,12 @@ export {
   type AuthOptions,
 } from "./generator/page-analyzer";
 export { crawlSite, type CrawlResult } from "./generator/crawler";
+export {
+  runPipeline,
+  runParallelStages,
+  type PipelineStage,
+  type PipelineResult,
+} from "./generator/pipeline";
 
 // ── Structure Guide ─────────────────────────────────────────────────────────
 export {
