@@ -2583,6 +2583,40 @@ declare global {
   return { path: "cypress/support/commands/stub-api.ts", content };
 }
 
+export function visualRegressionCommand(): FileSpec {
+  const content = `/**
+ * Visual regression testing commands.
+ * Requires: npm install cypress-image-snapshot
+ */
+import { matchImageSnapshot } from "cypress-image-snapshot";
+
+Cypress.Commands.add("matchScreenshot", (name: string, options?: Record<string, unknown>) => {
+  cy.matchImageSnapshot({
+    name,
+    capture: "viewport",
+    ...options,
+  });
+});
+
+Cypress.Commands.add("compareScreenshot", (name: string, threshold = 0.1) => {
+  cy.matchImageSnapshot({
+    name,
+    failureThreshold: threshold,
+    failureThresholdType: "percent",
+  });
+});
+
+declare global {
+  namespace Cypress {
+    interface Chainable {
+      matchScreenshot(name: string, options?: Record<string, unknown>): Chainable<void>;
+      compareScreenshot(name: string, threshold?: number): Chainable<void>;
+    }
+  }
+}`;
+  return { path: "cypress/support/commands/visual-regression.ts", content };
+}
+
 export function structureGuide(o: ScaffoldOptions): FileSpec {
   const lang = o.language === "typescript" ? "TypeScript" : "JavaScript";
   const e = o.language === "typescript" ? "ts" : "js";
@@ -2759,4 +2793,63 @@ export function structureGuide(o: ScaffoldOptions): FileSpec {
   ];
 
   return { path: "guides/structure-guide.md", content: lines.join("\n") + "\n" };
+}
+
+export function testIsolationCommand(): FileSpec {
+  return {
+    path: "cypress/support/commands/isolation.ts",
+    content: `/**
+ * Test isolation commands for clean test state.
+ */
+
+Cypress.Commands.add("resetDatabase", () => {
+  cy.request({
+    method: "POST",
+    url: "/api/test/reset",
+    failOnStatusCode: false,
+  });
+});
+
+Cypress.Commands.add("seedDatabase", (fixture: string) => {
+  cy.fixture(fixture).then((data) => {
+    cy.request({
+      method: "POST",
+      url: "/api/test/seed",
+      body: data,
+      failOnStatusCode: false,
+    });
+  });
+});
+
+Cypress.Commands.add("clearLocalStorage", () => {
+  cy.window().then((win) => {
+    win.localStorage.clear();
+  });
+});
+
+Cypress.Commands.add("clearSessionStorage", () => {
+  cy.window().then((win) => {
+    win.sessionStorage.clear();
+  });
+});
+
+Cypress.Commands.add("clearAllStorage", () => {
+  cy.clearLocalStorage();
+  cy.clearSessionStorage();
+  cy.clearCookies();
+});
+
+declare global {
+  namespace Cypress {
+    interface Chainable {
+      resetDatabase(): Chainable<void>;
+      seedDatabase(fixture: string): Chainable<void>;
+      clearLocalStorage(): Chainable<void>;
+      clearSessionStorage(): Chainable<void>;
+      clearAllStorage(): Chainable<void>;
+    }
+  }
+}
+`,
+  };
 }
