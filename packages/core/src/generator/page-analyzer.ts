@@ -776,6 +776,24 @@ function fixTestMismatches(pageContent: string, testContent: string, singletonNa
 
   if (pageMethods.size === 0) return testContent;
 
+  // Common abbreviations to expand for matching
+  const abbreviations: Record<string, string> = {
+    "btn": "button",
+    "txt": "text",
+    "inp": "input",
+    "sel": "select",
+    "chk": "check",
+    "rm": "remove",
+  };
+
+  function expandAbbreviations(str: string): string {
+    let result = str.toLowerCase();
+    for (const [abbr, full] of Object.entries(abbreviations)) {
+      result = result.replace(new RegExp(abbr, "g"), full);
+    }
+    return result;
+  }
+
   // Find method calls in test (e.g., "siamloginPage.clickLogin()" -> "clickLogin")
   const callRegex = new RegExp(`${singletonName}\\.([a-zA-Z]+)\\(`, "g");
   const fixedTest = testContent.replace(callRegex, (fullMatch, methodName) => {
@@ -784,13 +802,13 @@ function fixTestMismatches(pageContent: string, testContent: string, singletonNa
       return fullMatch;
     }
 
-    // Find closest matching method
-    const normalizedMethod = methodName.toLowerCase();
+    // Find closest matching method (with abbreviation expansion)
+    const normalizedMethod = expandAbbreviations(methodName);
     let bestMatch = "";
     let bestScore = 0;
 
     for (const pageMethod of pageMethods) {
-      const normalizedPage = pageMethod.toLowerCase();
+      const normalizedPage = expandAbbreviations(pageMethod);
       // Exact match
       if (normalizedMethod === normalizedPage) {
         return `${singletonName}.${pageMethod}(`;
