@@ -39,6 +39,7 @@ QA-test-generator/
 │   │       │   ├── prompts.ts       # Shared prompt system (system prompts, chain-of-thought, self-critique, edge cases)
 │   │       │   ├── pipeline.ts      # Pipeline orchestrator (sequential + parallel stage execution)
 │   │       │   ├── crawler.ts       # Website crawler for autonomous generation
+│   │       │   ├── hybrid.ts        # Hybrid generation (Playwright + AI combined)
 │   │       │   └── fixer.ts         # AI-powered test fixer (failure analysis + suggestion)
 │   │       ├── commands/
 │   │       │   └── healing.ts       # Self-healing selector engine
@@ -61,6 +62,7 @@ QA-test-generator/
 │               ├── scenario.ts      # qa scenario — write AI scenarios
 │               ├── analyze.ts       # qa analyze — visit URL & generate artifacts
 │               ├── autonomous.ts    # qa autonomous — crawl site & discover pages
+│               ├── hybrid.ts        # qa hybrid — Playwright + AI (best accuracy)
 │               └── fix.ts           # qa fix — AI-powered test failure fixer
 ├── TUTORIAL.md                # ~770-line comprehensive tutorial
 ├── README.md                  # Project overview
@@ -194,9 +196,27 @@ qa analyze (interactive)
 qa autonomous --base-url "http://localhost:3000" --depth 2
   → Launch headless Chromium via Playwright
   → Crawl baseUrl up to depth levels (follows same-origin links)
-  → Extract: title, links, forms for each page
-  → Report discovered pages (URL, link count, form count)
-  → Future: auto-generate tests for discovered pages
+  → Extract: title, links, forms, elements for each page
+  → For each page: call generateAll() with detected elements
+  → Output: locators + page object + test spec per page
+```
+
+### Hybrid Generation Flow (qa hybrid)
+
+```
+qa hybrid -u "http://localhost:3000/login" -n "LoginPage" -y
+  → Launch headless Chromium via Playwright
+  → Navigate to URL (with optional authentication)
+  → Extract all interactive elements with real DOM selectors
+  → Generate scenario from detected elements
+  → Phase 1: LLM generates locators using REAL selectors from Playwright
+  → Phase 2: LLM generates page object with methods matching scenario
+  → Phase 3: LLM generates test spec implementing the scenario
+  → Post-generation validation:
+    → fixLocatorMismatches(): ensure page object uses correct locator names
+    → fixTestMismatches(): ensure test calls correct page object methods
+    → Abbreviation expansion: Btn→Button, Txt→Text, etc.
+  → Write all artifacts to project directories
 ```
 
 ### AI Test Fix Flow (qa fix)
@@ -235,6 +255,7 @@ qa fix --test cypress/e2e/test/smoke/login.cy.ts
 | `packages/core/src/generator/crawler.ts` | **Website crawler — Playwright-based site crawling for autonomous generation** |
 | `packages/core/src/generator/fixer.ts` | **AI-powered test fixer — failure analysis and code suggestion** |
 | `packages/core/src/generator/page-analyzer.ts` | **Page analysis via Playwright — visits URL, extracts elements, generates locators/pages/tests** |
+| `packages/core/src/generator/hybrid.ts` | **Hybrid generation — combines Playwright analysis with AI generation** |
 | `packages/core/src/generator/structure-guide.ts` | Structure Guide engine — analyzes projects, extracts conventions |
 | `packages/core/src/generator/guides/siam-llm-wiki.ts` | Built-in LLM-Wiki (Structure Guide) from reference project |
 | `packages/core/src/commands/healing.ts` | **Self-healing selector engine — tries fallback selectors to find elements** |
@@ -279,6 +300,24 @@ qa fix --test cypress/e2e/test/smoke/login.cy.ts
   - Auto-attaches to Allure on test failure
   - Provides Cypress commands: `cy.setupApiLogging()`, `cy.attachApiLogsToAllure()`, `cy.clearApiLogs()`, `cy.getApiLogs()`, `cy.watchApiErrors()`
 - **Files**: `packages/core/src/generator/templates.ts` (supportApiLogger, supportE2e, supportCommands), `packages/core/src/generator/scaffold.ts`
+
+### Post-Generation Validation
+- **Problem**: LLM generates mismatched names between locators, page object, and test files (e.g., `DOWNLOAD_CENTER_BUTTON` in locators but `DOWNLOAD_CENTER` in page object).
+- **Fix**: Added two validation functions in `page-analyzer.ts`:
+  - `fixLocatorMismatches()`: Ensures page object references match defined locator names
+  - `fixTestMismatches()`: Ensures test method calls match page object method names
+  - Abbreviation expansion: `Btn` → `Button`, `Txt` → `Text`, `Inp` → `Input`, etc.
+  - Partial matching: finds closest matching name when exact match fails
+- **Files**: `packages/core/src/generator/page-analyzer.ts` (fixLocatorMismatches, fixTestMismatches functions)
+- **Tests**: `packages/core/src/generator/__tests__/validation.test.ts` (13 test cases)
+
+### Hybrid Generation (Playwright + AI)
+- **Problem**: `qa auto` guesses selectors (low accuracy), `qa analyze` generates stub tests (low coverage).
+- **Fix**: Created `qa hybrid` command that combines both approaches:
+  - Uses Playwright to extract real DOM elements with accurate selectors
+  - Uses AI to generate comprehensive test scenarios
+  - Post-generation validation ensures consistency across all files
+- **Files**: `packages/core/src/generator/hybrid.ts`, `packages/cli/src/commands/hybrid.ts`
 
 ## Generated Project Structure
 
@@ -329,6 +368,7 @@ POM layers strictly separated: locators → pages → tests. Data flow: tests ca
 | `qa generate <type>` | Generate with AI: test/page/locators/helper/command/bdd/all (supports `--url`, `--guide`, `--tier`, `--scenario`, `--scenario-file`, `--name`, `--yes`) |
 | `qa analyze` | **Analyze a live web page via Playwright and generate locators, page object, and test spec. Supports authentication (`--login-url`, `--username`, `--password`) and scenario-based generation (`--scenario`, `--scenario-file`) for focused artifacts.** |
 | `qa autonomous` / `qa auto` | **Crawl a website and discover pages for autonomous test generation (supports `--base-url`, `--depth`, `--yes`)** |
+| `qa hybrid` | **Analyze page with Playwright + generate tests with AI (best accuracy). Supports `--url`, `--name`, `--login-url`, `--username`, `--password`, `--tier`, `--guide`, `--yes`** |
 | `qa fix` | **Analyze a failing test and suggest a fix with AI (supports `--test`, `--report`, `--yes`)** |
 | `qa generate-guide` / `qa gg` | Create Structure Guide from existing project (interactive or `--yes`) |
 | `qa chat` | Interactive QA assistant (supports `--guide` for context) |

@@ -146,6 +146,7 @@ ${chalk.bold.hex("#48dbfb")("🛠️  New Features")}
   ${chalk.bold("Prompt Engineering")}    ${chalk.dim("Chain-of-thought reasoning + self-critique in LLM prompts")}
   ${chalk.bold("Harness Engineering")}  ${chalk.dim("Network stubs, visual regression, accessibility, test isolation")}
   ${chalk.bold("Agentic Engineering")}  ${chalk.dim("Self-healing selectors, autonomous generation, feedback loop")}
+  ${chalk.bold("Post-Gen Validation")}  ${chalk.dim("Auto-fix locator & method name mismatches between files")}
 
 ${chalk.dim("╭─")} ${chalk.hex("#ff6b6b")("💡")} ${chalk.dim("Windows users: use")} ${chalk.bold("npm run qa")} ${chalk.dim("instead of bare")} ${chalk.bold("qa")} ${chalk.dim("─╮")}
 ${chalk.dim("╰─")} ${chalk.hex("#feca57")("🐞")} ${chalk.dim("Report issues:")} ${chalk.underline("https://github.com/anomalyco/QA-test-generator/issues")} ${chalk.dim("─╯")}

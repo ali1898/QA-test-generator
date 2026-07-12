@@ -140,6 +140,46 @@ qa autonomous --base-url "http://localhost:3000" --depth 2 -y
 
 The crawler launches headless Chromium via Playwright, follows same-origin links up to the specified depth, and reports discovered pages with their links and forms.
 
+### Hybrid Generation (Best Accuracy)
+
+Combine Playwright DOM analysis with AI generation for the most accurate test artifacts.
+
+```bash
+# Basic usage
+qa hybrid -u "http://localhost:3000/login" -n "LoginPage" -y
+
+# With authentication
+qa hybrid -u "http://localhost:3000/dashboard" -n "Dashboard" \
+    --login-url "http://localhost:3000/login" \
+    --username admin --password secret -y
+
+# With Structure Guide
+qa hybrid -u "http://localhost:3000/checkout" -n "Checkout" \
+    --guide ./guides/my-guide.md -y
+```
+
+| Option | Description |
+|--------|-------------|
+| `-u, --url <url>` | Page URL to analyze |
+| `-n, --name <name>` | Name for page/test (e.g., LoginPage, Dashboard) |
+| `-p, --project-root <dir>` | Project root (default: cwd) |
+| `-t, --tier <tier>` | Test tier: smoke (default) or regression |
+| `--guide <path>` | Structure Guide for conventions |
+| `--login-url <url>` | Login page URL (for authenticated pages) |
+| `--username <text>` | Username for login |
+| `--password <text>` | Password for login |
+| `--username-selector <selector>` | Username field CSS selector |
+| `--password-selector <selector>` | Password field CSS selector |
+| `--login-button-selector <selector>` | Login button CSS selector |
+| `--wait-for-selector <selector>` | Selector to wait for after login |
+| `-y, --yes` | Skip prompts, use defaults |
+
+**How it works:**
+1. Playwright extracts real DOM elements with accurate selectors
+2. AI generates comprehensive test scenarios
+3. Post-generation validation ensures consistency (locator names match, method names match)
+4. Abbreviation expansion handles common patterns (Btn→Button, Txt→Text)
+
 ### AI Test Fixer
 
 Analyze a failing test and get an AI-suggested fix.

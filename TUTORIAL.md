@@ -29,6 +29,7 @@ using LLM providers (local + cloud).
   - [`qa scenario` — Write AI Scenarios](#qa-scenario--write-ai-scenarios)
   - [`qa analyze` — Analyze Live Pages with AI](#qa-analyze--analyze-live-pages-with-ai)
   - [`qa autonomous` — Crawl & Discover Pages](#qa-autonomous--crawl--discover-pages)
+  - [`qa hybrid` — Playwright + AI (Best Accuracy)](#qa-hybrid--playwright--ai-best-accuracy)
   - [`qa fix` — Fix Failing Tests with AI](#qa-fix--fix-failing-tests-with-ai)
   - [`qa config` — Manage Providers](#qa-config--manage-providers)
   - [`qa models` — List Available Models](#qa-models--list-available-models)
@@ -672,6 +673,78 @@ qa autonomous --base-url "http://localhost:3000" --depth 2 -y
 
 The crawler follows same-origin links only and respects the depth limit. Use this
 to discover all pages in your application before generating tests for each one.
+
+---
+
+### `qa hybrid` — Playwright + AI (Best Accuracy)
+
+Combine Playwright DOM analysis with AI generation for the most accurate test artifacts.
+This is the recommended approach for generating tests from live pages.
+
+```bash
+# Basic usage — analyze page and generate tests
+qa hybrid -u "http://localhost:3000/login" -n "LoginPage" -y
+
+# With authentication
+qa hybrid -u "http://localhost:3000/dashboard" -n "Dashboard" \
+    --login-url "http://localhost:3000/login" \
+    --username admin --password secret -y
+
+# With Structure Guide for consistent conventions
+qa hybrid -u "http://localhost:3000/checkout" -n "Checkout" \
+    --guide ./guides/my-guide.md -y
+```
+
+**Options:**
+
+| Flag | Default | Description |
+|---|---|---|
+| `-u, --url` | *(required)* | Page URL to analyze |
+| `-n, --name` | `Page` | Name for page/test (e.g., LoginPage, Dashboard) |
+| `-p, --project-root` | current dir | Project root directory |
+| `-t, --tier` | `smoke` | Test tier: smoke or regression |
+| `--guide` | — | Structure Guide for conventions |
+| `--login-url` | — | Login page URL (for authenticated pages) |
+| `--username` | — | Username for login |
+| `--password` | — | Password for login |
+| `-y, --yes` | — | Skip prompts, use defaults |
+
+**How it works:**
+
+1. **Playwright Analysis** — Launches headless Chromium, navigates to the URL, extracts all interactive elements with real DOM selectors (id, name, placeholder, data-cy, CSS)
+2. **AI Generation** — Uses LLM to generate:
+   - Locators file with accurate selectors from Playwright
+   - Page object with typed methods for each element
+   - Test spec implementing a comprehensive scenario
+3. **Post-Generation Validation** — Automatically fixes mismatches:
+   - Locator names match between locators file and page object
+   - Method names match between page object and test
+   - Abbreviation expansion (Btn→Button, Txt→Text, etc.)
+
+**Example output:**
+
+```
+  Hybrid Generation
+
+  URL:      http://localhost:3000/login
+  name:     LoginPage
+  tier:     smoke
+  mode:     Playwright + AI (best accuracy)
+
+  Generated Files
+
+  ✔ cypress/e2e/locators/loginPageLocators.ts
+  ✔ cypress/e2e/pages/loginPagePage.ts
+  ✔ cypress/e2e/test/smoke/loginPage.cy.ts
+```
+
+**vs. other commands:**
+
+| Command | Selector Source | Test Quality | Best For |
+|---------|----------------|--------------|----------|
+| `qa auto` | LLM guessed | LLM full test | Quick exploration |
+| `qa analyze` | Playwright real | Stub only | Element discovery |
+| `qa hybrid` | Playwright real | LLM full test | **Production tests** |
 
 ---
 
