@@ -2617,6 +2617,48 @@ declare global {
   return { path: "cypress/support/commands/visual-regression.ts", content };
 }
 
+export function accessibilityCommand(): FileSpec {
+  const content = `/**
+ * Accessibility testing commands.
+ * Requires: npm install cypress-axe axe-core
+ */
+import "cypress-axe";
+
+Cypress.Commands.add("checkA11y", (context?: string | Node, options?: Record<string, unknown>) => {
+  cy.injectAxe();
+  cy.checkA11y(context, options);
+});
+
+Cypress.Commands.add("checkA11yForViolations", (context?: string | Node) => {
+  cy.injectAxe();
+  cy.checkA11y(
+    context,
+    { runOnly: { type: "tag", values: ["wcag2a", "wcag2aa"] } },
+    (violations) => {
+      if (violations.length) {
+        cy.log(\`Found \${violations.length} accessibility violations\`);
+        violations.forEach((v) => {
+          cy.log(\`\${v.impact}: \${v.description}\`);
+          v.nodes.forEach((node) => {
+            cy.log(\`  - \${node.html}\`);
+          });
+        });
+      }
+    }
+  );
+});
+
+declare global {
+  namespace Cypress {
+    interface Chainable {
+      checkA11y(context?: string | Node, options?: Record<string, unknown>): Chainable<void>;
+      checkA11yForViolations(context?: string | Node): Chainable<void>;
+    }
+  }
+}`;
+  return { path: "cypress/support/commands/a11y.ts", content };
+}
+
 export function structureGuide(o: ScaffoldOptions): FileSpec {
   const lang = o.language === "typescript" ? "TypeScript" : "JavaScript";
   const e = o.language === "typescript" ? "ts" : "js";
