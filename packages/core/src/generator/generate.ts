@@ -4,7 +4,7 @@ import { getActiveProvider } from "../llm";
 import type { ChatMessage, LLMProvider } from "../llm/types";
 import { loadStructureGuide, resolveArtifactPath, findNearestGuide } from "./structure-guide";
 import type { StructureMeta } from "./structure-guide";
-import { QA_SYSTEM_PROMPT, buildSystemPrompt, CHAIN_OF_THOUGHT_PREFIX, SELF_CRITIQUE_SUFFIX } from "./prompts";
+import { QA_SYSTEM_PROMPT, buildSystemPrompt, CHAIN_OF_THOUGHT_PREFIX, SELF_CRITIQUE_SUFFIX, EDGE_CASE_PROMPT } from "./prompts";
 
 export interface GenerateOptions {
   projectRoot: string;
@@ -19,6 +19,8 @@ export interface GenerateOptions {
   scenario?: string;
   /** Override name used for file/class naming (instead of deriving from description). */
   name?: string;
+  /** Generate additional edge case tests (empty fields, special chars, injection, etc.). */
+  edgeCases?: boolean;
 }
 
 interface GuideContext {
@@ -409,7 +411,7 @@ ${scenario}
 
 Write describe/it blocks (no tags metadata) with ${options.tier === "regression" ? "regression" : "smoke"} tests.
 Call page methods in the same order as the scenario steps.
-Use page methods for all interactions. Do NOT use cy.getByCy or cy.get directly.
+Use page methods for all interactions. Do NOT use cy.getByCy or cy.get directly.${options.edgeCases ? EDGE_CASE_PROMPT : ""}
 ${SELF_CRITIQUE_SUFFIX}`;
 
   const testContent = await askLlm(provider, testPrompt, systemPrompt);

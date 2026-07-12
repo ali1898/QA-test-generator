@@ -83,6 +83,7 @@ export {
   QA_SYSTEM_PROMPT,
   QA_CHAT_SYSTEM_PROMPT,
   buildSystemPrompt,
+  EDGE_CASE_PROMPT,
 } from "./generator/prompts";
 
 // ── Docs ────────────────────────────────────────────────────────────────────

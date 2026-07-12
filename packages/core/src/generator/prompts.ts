@@ -55,6 +55,21 @@ After generating code, review it against these checks:
 
 If you find issues, fix them before returning the final code.`;
 
+export const EDGE_CASE_PROMPT = `
+
+Generate additional test cases for edge cases:
+- Empty required fields
+- Special characters in inputs (< > " ' &)
+- Very long text inputs (1000+ characters)
+- Invalid email formats
+- Password too short/long
+- SQL injection attempts (single quotes, semicolons)
+- XSS attempts (script tags, event handlers)
+- Network timeout scenarios
+- Concurrent form submissions
+
+Add these as separate it() blocks with descriptive names.`;
+
 export function buildSystemPrompt(guideCtx?: { markdown: string }): string {
   if (!guideCtx) return QA_SYSTEM_PROMPT;
   return `${QA_SYSTEM_PROMPT}
