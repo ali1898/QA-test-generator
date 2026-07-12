@@ -76,8 +76,14 @@ export type {
 export {
   ChatSession,
   askQa,
-  QA_CHAT_SYSTEM_PROMPT,
 } from "./chat/chat-session";
+
+// ── Prompts ────────────────────────────────────────────────────────────────
+export {
+  QA_SYSTEM_PROMPT,
+  QA_CHAT_SYSTEM_PROMPT,
+  buildSystemPrompt,
+} from "./generator/prompts";
 
 // ── Docs ────────────────────────────────────────────────────────────────────
 export {

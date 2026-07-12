@@ -6,16 +6,7 @@
  */
 import { getActiveProvider } from "../llm";
 import type { ChatMessage, ChatOptions, LLMProvider } from "../llm/types";
-
-export const QA_CHAT_SYSTEM_PROMPT = `You are an expert QA automation engineer and mentor.
-You help with Cypress, Cucumber BDD, Page Object Model, test strategy,
-selectors, CI/CD for tests, and general software testing questions.
-
-Guidelines:
-- Be concise but complete. Prefer working code snippets over prose.
-- When suggesting Cypress code, prefer data-cy selectors and avoid cy.wait(n).
-- When the user shares a test problem, first identify the likely cause, then give the fix.
-- If you don't know something, say so rather than guessing.`;
+import { QA_CHAT_SYSTEM_PROMPT } from "../generator/prompts";
 
 export interface ChatSessionOptions {
   provider?: LLMProvider;
