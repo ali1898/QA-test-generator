@@ -28,5 +28,14 @@ cypress.config.ts
 .env
 .env.local
 
+# Coverage reports
+coverage/
+.nyc_output/
+
+# Package manager caches
+.npm/
+.yarn/
+.pnp.*
+
 # MiMoCode internal
 .mimocode/
