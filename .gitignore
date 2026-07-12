@@ -27,3 +27,6 @@ cypress.config.ts
 # Local config may contain API keys
 .env
 .env.local
+
+# MiMoCode internal
+.mimocode/
