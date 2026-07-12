@@ -4,7 +4,7 @@ import { getActiveProvider } from "../llm";
 import type { ChatMessage, LLMProvider } from "../llm/types";
 import { loadStructureGuide, resolveArtifactPath, findNearestGuide } from "./structure-guide";
 import type { StructureMeta } from "./structure-guide";
-import { QA_SYSTEM_PROMPT, buildSystemPrompt } from "./prompts";
+import { QA_SYSTEM_PROMPT, buildSystemPrompt, CHAIN_OF_THOUGHT_PREFIX, SELF_CRITIQUE_SUFFIX } from "./prompts";
 
 export interface GenerateOptions {
   projectRoot: string;
@@ -330,7 +330,7 @@ Rules:
 Only generate locators for these specific elements. Do NOT add extra locators.`
     : "Include locators for all interactive elements the page likely has.";
 
-  const locPrompt = `You are generating a Cypress locators file for a page.
+  const locPrompt = `${CHAIN_OF_THOUGHT_PREFIX}You are generating a Cypress locators file for a page.
 Page description: ${description}${options.url ? `\nURL: ${options.url}` : ""}
 
 Here is the test scenario that the locators must support:
@@ -354,7 +354,8 @@ Example structure (flat, no nesting):
     SEARCH_BUTTON: "selector",
   } as const;
 
-  export type ${pageName}Locators = typeof ${locConstName};`;
+  export type ${pageName}Locators = typeof ${locConstName};
+${SELF_CRITIQUE_SUFFIX}`;
 
   const locContent = await askLlm(provider, locPrompt, systemPrompt);
 
@@ -365,7 +366,7 @@ Example structure (flat, no nesting):
   const pageSingletonName = camelCase(pageClassName);
   const locToPageImport = `../locators/${locFileName}`;
 
-  const pagePrompt = `You are generating a Cypress Page Object class in TypeScript.
+  const pagePrompt = `${CHAIN_OF_THOUGHT_PREFIX}You are generating a Cypress Page Object class in TypeScript.
 Page description: ${description}${options.url ? `\nURL: ${options.url}` : ""}
 
 Here is the test scenario this Page Object must support:
@@ -389,14 +390,15 @@ IMPORTANT: Create methods that exactly match the steps in the scenario above.
 For example, if the scenario says:
   1. **Type** "car" into **search input**
   2. **Click** **search button**
-Then the page MUST have methods: typeInSearchInput(value), clickSearchButton().`;
+Then the page MUST have methods: typeInSearchInput(value), clickSearchButton().
+${SELF_CRITIQUE_SUFFIX}`;
 
   const pageContent = await askLlm(provider, pagePrompt, systemPrompt);
 
   const absPagePath = writeArtifact(options.projectRoot, pageRelPath, pageContent);
 
   // ── Phase 3: Generate test spec that implements the scenario ──────────────
-  const testPrompt = `You are generating a Cypress test spec file in TypeScript.
+  const testPrompt = `${CHAIN_OF_THOUGHT_PREFIX}You are generating a Cypress test spec file in TypeScript.
 
 Use these exact import names:
 - Import the page singleton from: "${pageRelImport}"
@@ -407,7 +409,8 @@ ${scenario}
 
 Write describe/it blocks (no tags metadata) with ${options.tier === "regression" ? "regression" : "smoke"} tests.
 Call page methods in the same order as the scenario steps.
-Use page methods for all interactions. Do NOT use cy.getByCy or cy.get directly.`;
+Use page methods for all interactions. Do NOT use cy.getByCy or cy.get directly.
+${SELF_CRITIQUE_SUFFIX}`;
 
   const testContent = await askLlm(provider, testPrompt, systemPrompt);
 
