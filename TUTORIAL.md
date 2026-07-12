@@ -28,9 +28,19 @@ using LLM providers (local + cloud).
   - [`qa docs` — Generate Documentation](#qa-docs--generate-documentation)
   - [`qa scenario` — Write AI Scenarios](#qa-scenario--write-ai-scenarios)
   - [`qa analyze` — Analyze Live Pages with AI](#qa-analyze--analyze-live-pages-with-ai)
+  - [`qa autonomous` — Crawl & Discover Pages](#qa-autonomous--crawl--discover-pages)
+  - [`qa fix` — Fix Failing Tests with AI](#qa-fix--fix-failing-tests-with-ai)
   - [`qa config` — Manage Providers](#qa-config--manage-providers)
   - [`qa models` — List Available Models](#qa-models--list-available-models)
 - [Working with Providers](#working-with-providers)
+- [Features](#features)
+  - [Network Stubbing](#network-stubbing)
+  - [Visual Regression Testing](#visual-regression-testing)
+  - [Accessibility Testing](#accessibility-testing)
+  - [Test Isolation](#test-isolation)
+  - [Self-Healing Tests](#self-healing-tests)
+  - [Prompt Engineering](#prompt-engineering)
+  - [Pipeline Orchestrator](#pipeline-orchestrator)
 - [FAQ & Troubleshooting](#faq--troubleshooting)
 
 ---
@@ -616,6 +626,118 @@ qa analyze -u "http://app.example.com/Events/AddMember" \
 
 ---
 
+### `qa autonomous` — Crawl & Discover Pages
+
+Crawl a website to discover pages for autonomous test generation. Uses Playwright
+to navigate, follow links, and extract page metadata.
+
+```bash
+# Interactive mode — prompts for base URL and depth
+qa autonomous
+
+# Non-interactive with flags
+qa autonomous --base-url "http://localhost:3000" --depth 2 -y
+```
+
+**Options:**
+
+| Flag | Default | Description |
+|---|---|---|
+| `--base-url` | *(required)* | Base URL to start crawling from |
+| `-d, --depth` | `1` | Crawl depth (1-3 levels) |
+| `-p, --project-root` | current dir | Project root directory |
+| `-y, --yes` | — | Skip prompts, use defaults |
+
+**Example output:**
+
+```
+  Autonomous Generation
+
+  base URL:  http://localhost:3000
+  depth:     2
+
+  Found 5 pages
+
+  Login
+    URL: http://localhost:3000/
+    Links: 3, Forms: 1
+  Dashboard
+    URL: http://localhost:3000/dashboard
+    Links: 5, Forms: 0
+  Settings
+    URL: http://localhost:3000/settings
+    Links: 2, Forms: 1
+  ...
+```
+
+The crawler follows same-origin links only and respects the depth limit. Use this
+to discover all pages in your application before generating tests for each one.
+
+---
+
+### `qa fix` — Fix Failing Tests with AI
+
+Analyze a failing Cypress test and get an AI-suggested fix. Reads the test code
+and error context, then uses the LLM to suggest corrected code.
+
+```bash
+# Interactive mode — prompts for error message and stack trace
+qa fix --test cypress/e2e/test/smoke/login.cy.ts
+
+# With a failure report file (extracts error automatically)
+qa fix --test cypress/e2e/test/smoke/login.cy.ts \
+    --report ./cypress/results/output.json
+
+# Auto-apply the fix (non-interactive)
+qa fix --test cypress/e2e/test/smoke/login.cy.ts -y
+```
+
+**Options:**
+
+| Flag | Description |
+|---|---|
+| `-t, --test` | Path to the failing test file |
+| `-r, --report` | Path to test report file (JSON/HTML) for error extraction |
+| `-p, --project-root` | Project root (default: current directory) |
+| `-y, --yes` | Skip prompts, auto-apply the suggested fix |
+
+**Interactive flow:**
+
+```
+? Path to failing test file: cypress/e2e/test/smoke/login.cy.ts
+? Error message: AssertionError: Timed out retrying after 5000ms:
+  Expected to find element '[data-cy="submit"]', but never did.
+? Stack trace (optional): at Context.eval (login.cy.ts:12:5)
+
+  Analyzing failure...
+
+  Suggested fix:
+
+  describe('Login', () => {
+    beforeEach(() => {
+      cy.visit('/login');
+    });
+
+    it('should login with valid credentials', () => {
+      cy.get('[data-cy="username"]').type('admin');
+      cy.get('[data-cy="password"]').type('123456');
+      cy.get('[data-cy="submit-button"]').click();  // Fixed selector
+      cy.url().should('include', '/dashboard');
+    });
+  });
+
+? Apply this fix? Yes
+  Fix applied successfully!
+```
+
+**Tips:**
+- Provide a failure report (`--report`) for automatic error extraction
+- Without a report, you'll be prompted for the error message and stack trace
+- Review the suggested fix before applying — the AI may suggest different approaches
+- Works best with clear, descriptive error messages
+
+---
+
 ## Working with Providers
 
 ### Switching Between Providers
@@ -726,6 +848,127 @@ The guide is written as `.qa-guide.md` in the project root. Whenever you run `qa
 ### Using in existing projects
 
 You can also add the LLM-Wiki to an existing project by copying the `.qa-guide.md` file into its root, or by running `qa generate-guide -p ./my-project` to create a custom guide from your own project.
+
+---
+
+## Features
+
+### Network Stubbing
+
+Stub API responses for deterministic testing without a live backend.
+
+```typescript
+// Stub using fixture data
+cy.stubApi('POST /api/auth/login', 'success');
+cy.stubApi('GET /api/users', 'failure');
+
+// Manual intercept with custom response
+cy.intercept('POST', '/api/orders', {
+  statusCode: 201,
+  body: { id: 1, status: 'created' }
+}).as('createOrder');
+```
+
+Stub data is defined in `cypress/fixtures/api-stubs/sample.json`. Edit this file
+to add your own API stubs with different scenarios (success, failure, error, etc.).
+
+### Visual Regression Testing
+
+Capture and compare screenshots to detect visual regressions.
+
+```typescript
+// Capture a screenshot (creates baseline on first run)
+cy.matchScreenshot('login-page');
+
+// Compare with a custom failure threshold
+cy.compareScreenshot('dashboard', 0.05);  // 5% tolerance
+```
+
+Requires `cypress-image-snapshot`. Install it in your project:
+
+```bash
+npm install -D cypress-image-snapshot
+```
+
+### Accessibility Testing
+
+Run axe-core checks against WCAG 2.0 AA standards.
+
+```typescript
+// Check entire page
+cy.checkA11y();
+
+// Check a specific region
+cy.checkA11y('.login-form');
+
+// Log detailed violation info
+cy.checkA11yForViolations();
+```
+
+Requires `cypress-axe` and `axe-core`. Install them:
+
+```bash
+npm install -D cypress-axe axe-core
+```
+
+### Test Isolation
+
+Commands for clean test state between tests.
+
+```typescript
+beforeEach(() => {
+  cy.resetDatabase();       // POST /api/test/reset
+  cy.clearAllStorage();     // localStorage + sessionStorage + cookies
+});
+
+// Seed specific test data
+cy.seedDatabase('users');   // Reads from cypress/fixtures/users.json
+```
+
+### Self-Healing Tests
+
+Try multiple selectors to find elements, making tests resilient to UI changes.
+
+```typescript
+// Try primary selector, fall back to alternatives
+cy.getHealed('[data-cy="submit"]', ['#submit-btn', 'button[type="submit"]']);
+
+// Click with self-healing
+cy.clickHealed('[data-cy="login-btn"]', ['#login-button']);
+
+// Type with self-healing
+cy.typeHealed('[data-cy="email"]', 'user@example.com', ['#email-input']);
+```
+
+### Prompt Engineering
+
+The shared prompt system improves generation quality through:
+
+- **Chain-of-thought** — guides the LLM to analyze the scenario step-by-step before generating code
+- **Self-critique** — makes the LLM review its output against quality checks
+- **Edge cases** — generates additional test cases for boundary conditions, XSS, SQL injection, etc.
+
+These are applied automatically during `qa generate all` and can be used programmatically:
+
+```typescript
+import { CHAIN_OF_THOUGHT_PREFIX, SELF_CRITIQUE_SUFFIX, EDGE_CASE_PROMPT } from "@qa-test-generator/core";
+```
+
+### Pipeline Orchestrator
+
+The pipeline coordinates multi-stage LLM generation:
+
+```typescript
+import { runPipeline, runParallelStages } from "@qa-test-generator/core";
+
+// Sequential: each stage feeds into the next
+const results = await runPipeline(stages, initialInput, provider);
+
+// Parallel: run independent stages concurrently
+const results = await runParallelStages(stages, inputs, provider);
+```
+
+Used by `qa generate all` to chain: scenario → locators → page → test.
 
 ---
 

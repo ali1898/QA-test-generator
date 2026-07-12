@@ -119,6 +119,49 @@ qa scenario --guide ./my-guide.md
 qa g all -g "checkout" --scenario-file scenarios/checkout-with-coupon-code.md -u "http://localhost:3000"
 ```
 
+### Autonomous Generation
+
+Crawl a website to discover pages for autonomous test generation.
+
+```bash
+# Interactive mode
+qa autonomous
+
+# With flags
+qa autonomous --base-url "http://localhost:3000" --depth 2 -y
+```
+
+| Option | Description |
+|--------|-------------|
+| `--base-url <url>` | Base URL to crawl |
+| `-d, --depth <number>` | Crawl depth (1-3, default: 1) |
+| `-p, --project-root <dir>` | Project root (default: cwd) |
+| `-y, --yes` | Skip prompts, use defaults |
+
+The crawler launches headless Chromium via Playwright, follows same-origin links up to the specified depth, and reports discovered pages with their links and forms.
+
+### AI Test Fixer
+
+Analyze a failing test and get an AI-suggested fix.
+
+```bash
+# Interactive mode (prompts for error + stack trace)
+qa fix --test cypress/e2e/test/smoke/login.cy.ts
+
+# With a failure report file
+qa fix --test cypress/e2e/test/smoke/login.cy.ts --report ./cypress/results/output.json
+
+# Auto-apply (non-interactive)
+qa fix --test cypress/e2e/test/smoke/login.cy.ts -y
+```
+
+| Option | Description |
+|--------|-------------|
+| `-t, --test <path>` | Path to the failing test file |
+| `-r, --report <path>` | Path to test report file (JSON/HTML) for error extraction |
+| `-p, --project-root <dir>` | Project root (default: cwd) |
+| `-y, --yes` | Skip prompts, auto-apply fix |
+
 ### Page Analyzer (AI-Assisted)
 
 Analyze a live web page and generate test artifacts (locators, page object, test spec). Supports authentication and scenario-based generation.
@@ -237,6 +280,130 @@ Config is persisted at `~/.qa-test-gen/config.json`.
 | OpenRouter   | Cloud | —            | Yes              |
 | Gemini       | Cloud | —            | Yes              |
 | OpenCode Zen | Cloud | —            | Yes              |
+
+## Features
+
+### Network Stubbing
+
+Stub API responses for deterministic testing without a live backend.
+
+```typescript
+// In your test, stub a specific API endpoint
+cy.stubApi('POST /api/auth/login', 'success');  // Uses fixture data
+cy.stubApi('GET /api/users', 'failure');
+
+// Cypress intercept with custom response
+cy.intercept('POST', '/api/orders', {
+  statusCode: 201,
+  body: { id: 1, status: 'created' }
+}).as('createOrder');
+```
+
+Stub data is defined in `cypress/fixtures/api-stubs/sample.json`. The `cy.stubApi()` command reads from this fixture and applies `cy.intercept()` automatically.
+
+### Visual Regression Testing
+
+Capture and compare screenshots to detect visual changes.
+
+```typescript
+// Capture a full viewport screenshot
+cy.matchScreenshot('login-page');
+
+// Compare with a custom threshold
+cy.compareScreenshot('dashboard', 0.05);
+```
+
+Requires `cypress-image-snapshot`. Commands are defined in `cypress/support/commands/visual-regression.ts`.
+
+### Accessibility Testing
+
+Run axe-core checks against WCAG 2.0 AA standards.
+
+```typescript
+// Check entire page for a11y violations
+cy.checkA11y();
+
+// Check a specific region
+cy.checkA11y('.login-form');
+
+// Check with detailed violation logging
+cy.checkA11yForViolations();
+```
+
+Requires `cypress-axe` and `axe-core`. Commands are defined in `cypress/support/commands/a11y.ts`.
+
+### Test Isolation
+
+Commands for clean test state between tests.
+
+```typescript
+// Reset test database via API
+cy.resetDatabase();
+
+// Seed database from a fixture file
+cy.seedDatabase('users');
+
+// Clear all browser storage
+cy.clearAllStorage();
+
+// Clear individual storage types
+cy.clearLocalStorage();
+cy.clearSessionStorage();
+cy.clearCookies();
+```
+
+Commands are defined in `cypress/support/commands/isolation.ts`.
+
+### Self-Healing Tests
+
+Try multiple selectors to find elements, making tests resilient to UI changes.
+
+```typescript
+// Try primary selector, fall back to alternatives
+cy.getHealed('[data-cy="submit"]', ['#submit-btn', 'button[type="submit"]']);
+
+// Click with self-healing
+cy.clickHealed('[data-cy="login-btn"]', ['#login-button']);
+
+// Type with self-healing
+cy.typeHealed('[data-cy="email"]', 'user@example.com', ['#email-input']);
+```
+
+The `healSelector()` function from `@qa-test-generator/core` provides the underlying logic. Commands are defined in `cypress/support/commands/healing.ts`.
+
+### Prompt Engineering
+
+The shared prompt system in `prompts.ts` provides:
+
+- **System prompts** — `QA_SYSTEM_PROMPT` for generation, `QA_CHAT_SYSTEM_PROMPT` for chat
+- **Chain-of-thought** — `CHAIN_OF_THOUGHT_PREFIX` guides the LLM through step-by-step analysis before code generation
+- **Self-critique** — `SELF_CRITIQUE_SUFFIX` makes the LLM review its own output for correctness
+- **Edge cases** — `EDGE_CASE_PROMPT` generates additional test cases for boundary conditions, XSS, SQL injection, etc.
+
+### Pipeline Orchestrator
+
+The pipeline in `pipeline.ts` coordinates multi-stage LLM generation:
+
+- **Sequential execution** — `runPipeline()` chains stages where each stage's output feeds the next
+- **Parallel execution** — `runParallelStages()` runs independent stages concurrently
+- Used by `qa generate all` to chain: scenario → locators → page → test
+
+### Website Crawler
+
+The crawler in `crawler.ts` uses Playwright to:
+
+- Navigate to a base URL and follow same-origin links
+- Extract page titles, links, and forms at each depth level
+- Report discovered pages for autonomous test generation
+- Supports configurable depth (1-3 levels)
+
+### AI Test Fixer
+
+The fixer in `fixer.ts` provides:
+
+- **Failure analysis** — parses error messages and stack traces from test reports
+- **Code suggestion** — sends failing test + error context to the LLM for a corrected version
+- Used by `qa fix` to interactively analyze and fix failing tests
 
 ## Generated Project Structure
 

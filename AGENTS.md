@@ -35,7 +35,13 @@ QA-test-generator/
 │   │       │   ├── templates.ts # All generated file templates (~2100 lines)
 │   │       │   ├── generate.ts  # AI test/page/locator/helper/command/bdd/all generation
 │   │       │   ├── page-analyzer.ts # Web page analysis via Playwright
-│   │       │   └── structure-guide.ts # Analyze project → Structure Guide
+│   │       │   ├── structure-guide.ts # Analyze project → Structure Guide
+│   │       │   ├── prompts.ts       # Shared prompt system (system prompts, chain-of-thought, self-critique, edge cases)
+│   │       │   ├── pipeline.ts      # Pipeline orchestrator (sequential + parallel stage execution)
+│   │       │   ├── crawler.ts       # Website crawler for autonomous generation
+│   │       │   └── fixer.ts         # AI-powered test fixer (failure analysis + suggestion)
+│   │       ├── commands/
+│   │       │   └── healing.ts       # Self-healing selector engine
 │   │       ├── chat/
 │   │       │   └── chat-session.ts # QA-focused ChatSession (streaming)
 │   │       └── docs/
@@ -53,7 +59,9 @@ QA-test-generator/
 │               ├── config.ts        # qa config — manage providers
 │               ├── models.ts        # qa models — list models
 │               ├── scenario.ts      # qa scenario — write AI scenarios
-│               └── analyze.ts       # qa analyze — visit URL & generate artifacts
+│               ├── analyze.ts       # qa analyze — visit URL & generate artifacts
+│               ├── autonomous.ts    # qa autonomous — crawl site & discover pages
+│               └── fix.ts           # qa fix — AI-powered test failure fixer
 ├── TUTORIAL.md                # ~770-line comprehensive tutorial
 ├── README.md                  # Project overview
 └── package.json               # Root workspace config
@@ -180,6 +188,30 @@ qa analyze (interactive)
   → Same analysis & generation as above
 ```
 
+### Autonomous Generation Flow (qa autonomous)
+
+```
+qa autonomous --base-url "http://localhost:3000" --depth 2
+  → Launch headless Chromium via Playwright
+  → Crawl baseUrl up to depth levels (follows same-origin links)
+  → Extract: title, links, forms for each page
+  → Report discovered pages (URL, link count, form count)
+  → Future: auto-generate tests for discovered pages
+```
+
+### AI Test Fix Flow (qa fix)
+
+```
+qa fix --test cypress/e2e/test/smoke/login.cy.ts
+  → Read the failing test file content
+  → Optionally parse a failure report (--report) for error + stack trace
+  → If no report: prompt for error message and stack trace
+  → Send test code + error context to LLM provider
+  → LLM analyzes failure and returns corrected test code
+  → Display suggested fix
+  → Interactive: confirm to apply fix to file
+```
+
 ## Code Conventions
 
 - **Exports**: named exports + barrel files. `packages/core/src/index.ts` re-exports everything public.
@@ -198,9 +230,14 @@ qa analyze (interactive)
 | `packages/core/src/generator/templates.ts` | All ~30 generated file templates (package.json, pages, tests, CI/CD, etc.) |
 | `packages/core/src/generator/scaffold.ts:46` | `collectFiles()` — which templates go into a project |
 | `packages/core/src/generator/generate.ts:8` | `QA_SYSTEM_PROMPT` — LLM system prompt for test generation |
+| `packages/core/src/generator/prompts.ts` | **Shared prompt system — chain-of-thought, self-critique, edge-case prompts** |
+| `packages/core/src/generator/pipeline.ts` | **Pipeline orchestrator — sequential + parallel LLM stage execution** |
+| `packages/core/src/generator/crawler.ts` | **Website crawler — Playwright-based site crawling for autonomous generation** |
+| `packages/core/src/generator/fixer.ts` | **AI-powered test fixer — failure analysis and code suggestion** |
 | `packages/core/src/generator/page-analyzer.ts` | **Page analysis via Playwright — visits URL, extracts elements, generates locators/pages/tests** |
 | `packages/core/src/generator/structure-guide.ts` | Structure Guide engine — analyzes projects, extracts conventions |
 | `packages/core/src/generator/guides/siam-llm-wiki.ts` | Built-in LLM-Wiki (Structure Guide) from reference project |
+| `packages/core/src/commands/healing.ts` | **Self-healing selector engine — tries fallback selectors to find elements** |
 | `packages/core/src/config/schema.ts:8` | `providerConfigSchema` / `appConfigSchema` — Zod schemas |
 | `packages/cli/src/index.ts:29` | Commander program definition + all command registrations |
 
@@ -291,6 +328,8 @@ POM layers strictly separated: locators → pages → tests. Data flow: tests ca
 | `qa new` | Scaffold a Cypress project (interactive or `--yes`, `--llm-wiki`, `--scenarios`) |
 | `qa generate <type>` | Generate with AI: test/page/locators/helper/command/bdd/all (supports `--url`, `--guide`, `--tier`, `--scenario`, `--scenario-file`, `--name`, `--yes`) |
 | `qa analyze` | **Analyze a live web page via Playwright and generate locators, page object, and test spec. Supports authentication (`--login-url`, `--username`, `--password`) and scenario-based generation (`--scenario`, `--scenario-file`) for focused artifacts.** |
+| `qa autonomous` / `qa auto` | **Crawl a website and discover pages for autonomous test generation (supports `--base-url`, `--depth`, `--yes`)** |
+| `qa fix` | **Analyze a failing test and suggest a fix with AI (supports `--test`, `--report`, `--yes`)** |
 | `qa generate-guide` / `qa gg` | Create Structure Guide from existing project (interactive or `--yes`) |
 | `qa chat` | Interactive QA assistant (supports `--guide` for context) |
 | `qa docs` | Generate project docs (Markdown/HTML/Confluence, interactive or `--yes`) |
