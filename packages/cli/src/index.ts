@@ -143,10 +143,12 @@ ${chalk.dim("╰─")} ${chalk.hex("#feca57")("🐞")} ${chalk.dim("Report issue
 program
   .command("autonomous")
   .alias("auto")
-  .description("Crawl a website and discover pages for autonomous test generation")
+  .description("Crawl a website, discover pages, and generate tests autonomously")
   .option("--base-url <url>", "base URL to crawl")
   .option("-d, --depth <number>", "crawl depth (1-3)", parseInt)
   .option("-p, --project-root <dir>", "project root (default: cwd)")
+  .option("--forms-only", "only generate tests for pages with forms")
+  .option("-t, --tier <tier>", "test tier: smoke (default) or regression")
   .option("-y, --yes", "skip prompts, use defaults + provided flags")
   .action(async (opts) => {
     try {
@@ -155,6 +157,8 @@ program
         depth: opts.depth,
         projectRoot: opts.projectRoot,
         yes: opts.yes,
+        formsOnly: opts.formsOnly,
+        tier: opts.tier,
       });
     } catch (err) {
       ui.error(err instanceof Error ? err.message : String(err));
