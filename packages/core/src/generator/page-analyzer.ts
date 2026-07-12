@@ -750,7 +750,128 @@ describe("${ctx.pageName} page - ${ctx.tier} tests", () => {
   const testContent = await askLlm(provider, testPrompt, ctx.systemPrompt);
   if (ctx.debug) console.log(`[qa] DEBUG: [Scenario] Test spec generated (${testContent.length} chars)`);
 
-  return { locContent, pageContent, testContent };
+  // Validate and fix mismatches between locators and page object
+  const fixedPage = fixLocatorMismatches(locContent, pageContent, ctx.locConstName, ctx.debug);
+
+  // Validate and fix mismatches between page object and test
+  const fixedTest = fixTestMismatches(fixedPage, testContent, ctx.pageSingletonName, ctx.debug);
+
+  return { locContent, pageContent: fixedPage, testContent: fixedTest };
+}
+
+/**
+ * Validates test spec against page object and fixes method name mismatches.
+ * Extracts method names from page object, finds calls in test that don't match,
+ * and replaces them with the closest matching method name.
+ */
+function fixTestMismatches(pageContent: string, testContent: string, singletonName: string, debug?: boolean): string {
+  // Extract method names from page object (e.g., "clickLoginButton()" -> "clickLoginButton")
+  const methodRegex = /^\s+(?:click|type|select|check|uncheck|assert|visit|submit)\w*\s*\(/gm;
+  const pageMethods = new Set<string>();
+  let match;
+  while ((match = methodRegex.exec(pageContent)) !== null) {
+    const methodName = match[0].trim().split("(")[0].trim();
+    pageMethods.add(methodName);
+  }
+
+  if (pageMethods.size === 0) return testContent;
+
+  // Find method calls in test (e.g., "siamloginPage.clickLogin()" -> "clickLogin")
+  const callRegex = new RegExp(`${singletonName}\\.([a-zA-Z]+)\\(`, "g");
+  const fixedTest = testContent.replace(callRegex, (fullMatch, methodName) => {
+    // Check if method exists in page object
+    if (pageMethods.has(methodName)) {
+      return fullMatch;
+    }
+
+    // Find closest matching method
+    const normalizedMethod = methodName.toLowerCase();
+    let bestMatch = "";
+    let bestScore = 0;
+
+    for (const pageMethod of pageMethods) {
+      const normalizedPage = pageMethod.toLowerCase();
+      // Exact match
+      if (normalizedMethod === normalizedPage) {
+        return `${singletonName}.${pageMethod}(`;
+      }
+      // Check if one contains the other
+      if (normalizedPage.includes(normalizedMethod) || normalizedMethod.includes(normalizedPage)) {
+        const score = Math.min(normalizedMethod.length, normalizedPage.length);
+        if (score > bestScore) {
+          bestScore = score;
+          bestMatch = pageMethod;
+        }
+      }
+    }
+
+    if (bestMatch) {
+      if (debug) console.log(`[qa] DEBUG: Fixed method mismatch: ${methodName} -> ${bestMatch}`);
+      return `${singletonName}.${bestMatch}(`;
+    }
+
+    // No match found, keep original
+    return fullMatch;
+  });
+
+  return fixedTest;
+}
+
+/**
+ * Validates page object against locators file and fixes locator name mismatches.
+ * Extracts locator names from locators file, finds references in page object that don't match,
+ * and replaces them with the correct locator name.
+ */
+function fixLocatorMismatches(locContent: string, pageContent: string, locConstName: string, debug?: boolean): string {
+  // Extract locator names from locators file (e.g., "USERNAME_INPUT:" -> "USERNAME_INPUT")
+  const locatorRegex = /^\s+([A-Z][A-Z_0-9]+)\s*:/gm;
+  const definedLocators = new Set<string>();
+  let match;
+  while ((match = locatorRegex.exec(locContent)) !== null) {
+    definedLocators.add(match[1]);
+  }
+
+  if (definedLocators.size === 0) return pageContent;
+
+  // Find locator references in page object (e.g., "SIAMLOGIN_LOCATORS.DOWNLOAD_CENTER" -> "DOWNLOAD_CENTER")
+  const refRegex = new RegExp(`${locConstName}\\.([A-Z][A-Z_0-9]+)`, "g");
+  const fixedPage = pageContent.replace(refRegex, (fullMatch, locatorName) => {
+    // Check if locator exists in locators file
+    if (definedLocators.has(locatorName)) {
+      return fullMatch;
+    }
+
+    // Find closest matching locator
+    const normalizedLocator = locatorName.toLowerCase();
+    let bestMatch = "";
+    let bestScore = 0;
+
+    for (const definedLocator of definedLocators) {
+      const normalizedDefined = definedLocator.toLowerCase();
+      // Exact match
+      if (normalizedLocator === normalizedDefined) {
+        return `${locConstName}.${definedLocator}`;
+      }
+      // Check if one contains the other
+      if (normalizedDefined.includes(normalizedLocator) || normalizedLocator.includes(normalizedDefined)) {
+        const score = Math.min(normalizedLocator.length, normalizedDefined.length);
+        if (score > bestScore) {
+          bestScore = score;
+          bestMatch = definedLocator;
+        }
+      }
+    }
+
+    if (bestMatch) {
+      if (debug) console.log(`[qa] DEBUG: Fixed locator mismatch: ${locatorName} -> ${bestMatch}`);
+      return `${locConstName}.${bestMatch}`;
+    }
+
+    // No match found, keep original
+    return fullMatch;
+  });
+
+  return fixedPage;
 }
 
 
