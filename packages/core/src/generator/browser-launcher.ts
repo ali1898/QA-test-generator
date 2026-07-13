@@ -10,11 +10,11 @@ export interface LaunchOptions {
 }
 
 /**
- * Launches a Chromium browser with multi-strategy fallback:
+ * Launches a Chromium-based browser with multi-strategy fallback:
  * 1. Bundled Chromium (requires `npx playwright install chromium`)
  * 2. System Chrome (via channel: "chrome")
  * 3. System Chromium (via channel: "chromium")
- * 4. Platform-specific common browser paths
+ * 4. Platform-specific common browser paths (Chrome, Edge, Chromium)
  *
  * Works on Windows, Linux, and macOS without requiring `npx playwright install`.
  */
@@ -52,7 +52,7 @@ export async function launchBrowser(options: LaunchOptions = {}): Promise<Browse
     log(`System Chromium failed: ${(e as Error).message}`);
   }
 
-  // Strategy 4: Find browser by common paths
+  // Strategy 4: Find browser by common paths (Chrome, Edge, Chromium)
   const executablePath = findSystemBrowser();
   if (executablePath) {
     try {
@@ -66,15 +66,16 @@ export async function launchBrowser(options: LaunchOptions = {}): Promise<Browse
   }
 
   throw new Error(
-    "Could not find a Chromium/Chrome browser. Install one of:\n" +
+    "Could not find a Chromium-based browser. Install one of:\n" +
     "  - Google Chrome: https://www.google.com/chrome/\n" +
-    "  - Chromium: sudo apt install chromium-browser (Linux) or https://www.chromium.org/getting-involved/download-chromium/ (other)\n" +
+    "  - Microsoft Edge: https://www.microsoft.com/edge (Windows)\n" +
+    "  - Chromium: sudo apt install chromium-browser (Linux)\n" +
     "  - Or install bundled: npx playwright install chromium"
   );
 }
 
 /**
- * Finds a system-installed Chrome or Chromium browser by checking common paths.
+ * Finds a system-installed Chrome, Edge, or Chromium browser.
  */
 function findSystemBrowser(): string | null {
   const platform = process.platform;
@@ -83,21 +84,21 @@ function findSystemBrowser(): string | null {
 
   if (platform === "linux") {
     candidates.push(
-      // Debian/Ubuntu
+      // Chromium
       "/usr/bin/chromium-browser",
       "/usr/bin/chromium",
-      // Fedora/RHEL
       "/usr/bin/chromium-browser-freeworld",
-      // Snap
       "/snap/bin/chromium",
-      // Flatpak
       "/var/lib/flatpak/exports/bin/org.chromium.Chromium",
       // Google Chrome
       "/usr/bin/google-chrome",
       "/usr/bin/google-chrome-stable",
-      // Common custom paths
       "/opt/google/chrome/chrome",
       "/opt/chromium.org/chromium/chromium",
+      // Microsoft Edge
+      "/usr/bin/microsoft-edge",
+      "/usr/bin/microsoft-edge-stable",
+      "/opt/microsoft/msedge/msedge",
     );
   } else if (platform === "win32") {
     const localAppData = process.env.LOCALAPPDATA || join(homedir(), "AppData", "Local");
@@ -105,9 +106,14 @@ function findSystemBrowser(): string | null {
     const programFilesX86 = process.env["PROGRAMFILES(X86)"] || "C:\\Program Files (x86)";
 
     candidates.push(
+      // Google Chrome
       join(localAppData, "Google", "Chrome", "Application", "chrome.exe"),
       join(programFiles, "Google", "Chrome", "Application", "chrome.exe"),
       join(programFilesX86, "Google", "Chrome", "Application", "chrome.exe"),
+      // Microsoft Edge
+      join(programFiles, "Microsoft", "Edge", "Application", "msedge.exe"),
+      join(programFilesX86, "Microsoft", "Edge", "Application", "msedge.exe"),
+      // Chromium
       join(programFiles, "Chromium", "Application", "chrome.exe"),
       join(programFilesX86, "Chromium", "Application", "chrome.exe"),
     );
@@ -115,6 +121,7 @@ function findSystemBrowser(): string | null {
     candidates.push(
       "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
       "/Applications/Chromium.app/Contents/MacOS/Chromium",
+      "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
     );
   }
 
@@ -127,14 +134,16 @@ function findSystemBrowser(): string | null {
   // Try to find via which/where command
   try {
     const names = platform === "win32"
-      ? ["chrome", "chromium"]
-      : ["chromium-browser", "chromium", "google-chrome", "google-chrome-stable"];
+      ? ["chrome", "msedge", "chromium"]
+      : ["chromium-browser", "chromium", "google-chrome", "google-chrome-stable", "microsoft-edge"];
     for (const name of names) {
       try {
         const cmd = platform === "win32" ? `where ${name}` : `which ${name}`;
-        const result = execSync(cmd, { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] }).trim();
-        if (result && existsSync(result.split("\n")[0])) {
-          return result.split("\n")[0];
+        const result = execSync(cmd, { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] })
+          .trim()
+          .split(/\r?\n/)[0];
+        if (result && existsSync(result)) {
+          return result;
         }
       } catch {
         // not found, continue
@@ -164,18 +173,23 @@ export function detectSystemBrowsers(): Array<{ name: string; path: string; type
       { name: "Chromium (Snap)", path: "/snap/bin/chromium", type: "chromium" },
       { name: "Google Chrome", path: "/usr/bin/google-chrome", type: "chrome" },
       { name: "Google Chrome Stable", path: "/usr/bin/google-chrome-stable", type: "chrome" },
+      { name: "Microsoft Edge", path: "/usr/bin/microsoft-edge", type: "chrome" },
     );
   } else if (platform === "win32") {
     const localAppData = process.env.LOCALAPPDATA || join(homedir(), "AppData", "Local");
     const programFiles = process.env["PROGRAMFILES"] || "C:\\Program Files";
+    const programFilesX86 = process.env["PROGRAMFILES(X86)"] || "C:\\Program Files (x86)";
     candidates.push(
       { name: "Google Chrome", path: join(localAppData, "Google", "Chrome", "Application", "chrome.exe"), type: "chrome" },
       { name: "Google Chrome (x64)", path: join(programFiles, "Google", "Chrome", "Application", "chrome.exe"), type: "chrome" },
+      { name: "Microsoft Edge", path: join(programFiles, "Microsoft", "Edge", "Application", "msedge.exe"), type: "chrome" },
+      { name: "Microsoft Edge (x86)", path: join(programFilesX86, "Microsoft", "Edge", "Application", "msedge.exe"), type: "chrome" },
     );
   } else if (platform === "darwin") {
     candidates.push(
       { name: "Google Chrome", path: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", type: "chrome" },
       { name: "Chromium", path: "/Applications/Chromium.app/Contents/MacOS/Chromium", type: "chromium" },
+      { name: "Microsoft Edge", path: "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge", type: "chrome" },
     );
   }
 
@@ -191,6 +205,7 @@ export function detectSystemBrowsers(): Array<{ name: string; path: string; type
     const names: Array<{ name: string; cmd: string; type: "chrome" | "chromium" }> = platform === "win32"
       ? [
           { name: "Chrome", cmd: "where chrome", type: "chrome" },
+          { name: "Edge", cmd: "where msedge", type: "chrome" },
           { name: "Chromium", cmd: "where chromium", type: "chromium" },
         ]
       : [
@@ -198,11 +213,14 @@ export function detectSystemBrowsers(): Array<{ name: string; path: string; type
           { name: "Chromium", cmd: "which chromium", type: "chromium" },
           { name: "Google Chrome", cmd: "which google-chrome", type: "chrome" },
           { name: "Google Chrome", cmd: "which google-chrome-stable", type: "chrome" },
+          { name: "Microsoft Edge", cmd: "which microsoft-edge", type: "chrome" },
         ];
     for (const n of names) {
       if (seen.has(n.type)) continue;
       try {
-        const result = execSync(n.cmd, { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] }).trim().split("\n")[0];
+        const result = execSync(n.cmd, { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] })
+          .trim()
+          .split(/\r?\n/)[0];
         if (result && existsSync(result)) {
           found.push({ name: n.name, path: result, type: n.type });
           seen.add(n.type);

@@ -1565,7 +1565,7 @@ async function main() {
   const path = require("path");
   const fs = require("fs");
 
-  // First: detect system-installed Chrome/Chromium
+  // First: detect system-installed Chrome, Edge, or Chromium
   function findSystemBrowser() {
     const platform = os.platform();
     const candidates = [];
@@ -1573,30 +1573,40 @@ async function main() {
       candidates.push(
         "/usr/bin/chromium-browser", "/usr/bin/chromium",
         "/usr/bin/google-chrome", "/usr/bin/google-chrome-stable",
-        "/snap/bin/chromium"
+        "/snap/bin/chromium",
+        "/usr/bin/microsoft-edge", "/usr/bin/microsoft-edge-stable"
       );
     } else if (platform === "win32") {
       const local = process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local");
-      const pf = process.env["PROGRAMFILES"] || "C:\\\\Program Files";
+      const pf = process.env["PROGRAMFILES"] || "C:\\Program Files";
+      const pf86 = process.env["PROGRAMFILES(X86)"] || "C:\\Program Files (x86)";
       candidates.push(
         path.join(local, "Google", "Chrome", "Application", "chrome.exe"),
-        path.join(pf, "Google", "Chrome", "Application", "chrome.exe")
+        path.join(pf, "Google", "Chrome", "Application", "chrome.exe"),
+        path.join(pf86, "Google", "Chrome", "Application", "chrome.exe"),
+        path.join(pf, "Microsoft", "Edge", "Application", "msedge.exe"),
+        path.join(pf86, "Microsoft", "Edge", "Application", "msedge.exe")
       );
     } else if (platform === "darwin") {
       candidates.push(
         "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-        "/Applications/Chromium.app/Contents/MacOS/Chromium"
+        "/Applications/Chromium.app/Contents/MacOS/Chromium",
+        "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"
       );
     }
     for (const c of candidates) {
       if (fs.existsSync(c)) return c;
     }
     // Try which/where
-    const names = platform === "win32" ? ["chrome"] : ["chromium-browser", "chromium", "google-chrome"];
+    const names = platform === "win32"
+      ? ["chrome", "msedge"]
+      : ["chromium-browser", "chromium", "google-chrome", "microsoft-edge"];
     for (const n of names) {
       try {
         const cmd = platform === "win32" ? "where " + n : "which " + n;
-        const r = execSync(cmd, { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] }).trim().split("\\n")[0];
+        const r = execSync(cmd, { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] })
+          .trim()
+          .split(/\\r?\\n/)[0];
         if (r && fs.existsSync(r)) return r;
       } catch (_) {}
     }
@@ -1621,10 +1631,10 @@ async function main() {
   } catch (_) {}
 
   if (!playwrightReady && !systemBrowser) {
-    console.log("  \\u2717  No browser found \\u2014 need either Playwright Chromium or a system browser (Chrome/Chromium)");
+    console.log("  \\u2717  No browser found \\u2014 need either Playwright Chromium or a system browser (Chrome/Edge/Chromium)");
     console.log("         System browser is recommended (no download needed):");
     console.log("           Linux:  sudo apt install chromium-browser");
-    console.log("           Windows: install Google Chrome from https://www.google.com/chrome/");
+    console.log("           Windows: install Google Chrome or Microsoft Edge");
     console.log("");
     const resp = await ask("  Install Playwright Chromium? (y/N): ");
     if (resp === "y") {
@@ -1637,9 +1647,9 @@ async function main() {
         if (errMsg.includes("403") || errMsg.includes("AccessDenied") || errMsg.includes("not available in your location")) {
           console.log("");
           console.log("  \\u26a0\\uFE0F  Playwright download blocked (access denied / sanctions).");
-          console.log("  Use a system browser instead — install Google Chrome or Chromium:");
+          console.log("  Use a system browser instead — install Chrome, Edge, or Chromium:");
           console.log("    Linux:  sudo apt install chromium-browser");
-          console.log("    Windows: https://www.google.com/chrome/");
+          console.log("    Windows: install Google Chrome or Microsoft Edge");
           console.log("");
           console.log("  Or use a mirror proxy:");
           console.log("    PLAYWRIGHT_DOWNLOAD_HOST=https://your-mirror.com npx playwright install chromium");
