@@ -250,13 +250,15 @@ qa hybrid --url <URL> --steps-file steps/steps.json
 # Interactive mode: open browser, interact manually, then analyze
 qa hybrid --url <URL> --interactive
   → Opens a visible Chromium window (headed mode)
+  → Injects interaction tracker into the page (tracks clicks, focus, change, submit events)
   → User interacts with the page (clicks, fills, navigates)
-  → Press ENTER in the terminal to analyze the current page state
-  → Generates locators + page object + test spec from what's visible
+  → Press ENTER in the terminal to analyze ONLY the elements the user interacted with
+  → Generates locators + page object + test spec from tracked elements only
 
 # Also works with qa analyze
 qa analyze --url <URL> --interactive
-  → Same interactive flow, generates artifacts from current page state
+  → Same interactive flow with interaction tracking
+  → Generates artifacts from tracked elements only (not the entire page)
 ```
 
 ## Code Conventions
@@ -353,6 +355,15 @@ qa analyze --url <URL> --interactive
   2. **Runtime fallback**: `page-analyzer.ts` and `crawler.ts` try `chromium.launch()` first, then fall back to `chromium.launch({ channel: "chrome" })` which uses system-installed Chrome/Chromium
   3. **Manual path**: Users can download Chromium from `cdn.playwright.dev` and extract to `~/.cache/ms-playwright/chromium-<version>/`
 - **Files**: `packages/core/src/generator/templates.ts` (scriptsSetupCheckDeps), `packages/core/src/generator/page-analyzer.ts` (analyzePage), `packages/core/src/generator/crawler.ts` (crawlSite)
+
+### Interactive Mode Interaction Tracking
+- **Problem**: In interactive mode (`--interactive`), `extractElements()` collected ALL interactive elements from the page after the user pressed ENTER, not just the ones the user actually interacted with. This resulted in generated tests covering the entire page instead of only the user-selected elements.
+- **Fix**: Added interaction tracking in `analyzePage()`:
+  1. **Event listeners**: Inject JavaScript that tracks `click`, `change`, `focus`, and `submit` events on the page
+  2. **Element registry**: Each interacted element is stored in `window.__qaTrackedElements` Map with its selector and metadata
+  3. **Post-interaction filtering**: After the user presses ENTER, only elements with tracked selectors are included in the analysis
+  4. **Form filtering**: Forms are also filtered to only include forms containing tracked elements
+- **Files**: `packages/core/src/generator/page-analyzer.ts` (analyzePage function, lines 418-544)
 
 ## Generated Project Structure
 
