@@ -93,7 +93,6 @@ export function packageJson(o: ScaffoldOptions): FileSpec {
 
   pkg.overrides = {
     uuid: "^11",
-    glob: "^13",
   };
 
   return { path: "package.json", content: JSON.stringify(pkg, null, 2) + "\n" };
@@ -2263,6 +2262,23 @@ steps:
     displayName: 'Publish screenshots'
     condition: failed()
 `,
+  };
+}
+
+export function npmrc(_o: ScaffoldOptions): FileSpec {
+  return {
+    path: ".npmrc",
+    content: [
+      "# Windows long-path support (avoids TAR_ENTRY_INVALID errors during npm install)",
+      "longpaths=true",
+      "",
+      "# Prevent npm from sending anonymous usage stats",
+      "fund=false",
+      "",
+      "# Prefer fresh registry data to avoid corrupted cache entries",
+      "prefer-offline=false",
+      "",
+    ].join("\n"),
   };
 }
 
