@@ -20,6 +20,8 @@ export interface HybridOptions {
   yes?: boolean;
   interactive?: boolean;
   stepsFile?: string;
+  scenario?: string;
+  scenarioFile?: string;
 }
 
 export async function hybridCommand(opts: HybridOptions): Promise<void> {
@@ -93,6 +95,13 @@ export async function hybridCommand(opts: HybridOptions): Promise<void> {
     stepsConfig = JSON.parse(readFileSync(stepsPath, "utf-8"));
   }
 
+  // Read scenario from file or use inline scenario
+  let scenario = opts.scenario;
+  if (opts.scenarioFile) {
+    const scenarioPath = resolve(projectRoot, opts.scenarioFile);
+    scenario = readFileSync(scenarioPath, "utf-8");
+  }
+
   // In interactive mode, skip the spinner because ora conflicts with
   // process.stdin reading on Windows (spinner blocks the ENTER key).
   let result;
@@ -114,6 +123,7 @@ export async function hybridCommand(opts: HybridOptions): Promise<void> {
       } : undefined,
       interactive: opts.interactive,
       steps: stepsConfig,
+      scenario,
     });
     progress.stop("Page analyzed & tests generated");
   } else {
@@ -134,6 +144,7 @@ export async function hybridCommand(opts: HybridOptions): Promise<void> {
         } : undefined,
         interactive: opts.interactive,
         steps: stepsConfig,
+        scenario,
       });
     });
   }

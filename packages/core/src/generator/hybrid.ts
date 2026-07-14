@@ -13,6 +13,7 @@ export interface HybridOptions {
   debug?: boolean;
   interactive?: boolean;
   steps?: StepsConfig;
+  scenario?: string;
 }
 
 function sanitizeName(raw: string): string {
@@ -43,6 +44,7 @@ export async function hybridGenerate(
     debug: options.debug,
     interactive: options.interactive,
     steps: options.steps,
+    scenario: options.scenario,
   });
 
   return { paths: result.paths };

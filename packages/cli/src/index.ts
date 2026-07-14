@@ -208,6 +208,8 @@ program
   .option("-y, --yes", "skip prompts, use defaults + provided flags")
   .option("--interactive", "Open browser for manual interaction before analysis")
   .option("--steps-file <path>", "JSON file with pre-defined steps to execute before analysis")
+  .option("--scenario <text>", "pre-written scenario in Markdown (skips Phase 0)")
+  .option("--scenario-file <path>", "read scenario from file (skips Phase 0)")
   .action(async (opts) => {
     try {
       await hybridCommand({
@@ -226,6 +228,8 @@ program
         yes: opts.yes,
         interactive: opts.interactive,
         stepsFile: opts.stepsFile,
+        scenario: opts.scenario,
+        scenarioFile: opts.scenarioFile,
       });
     } catch (err) {
       ui.error(err instanceof Error ? err.message : String(err));
