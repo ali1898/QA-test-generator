@@ -1,13 +1,13 @@
-# 🧪 QA Test Generator
+# 🧪 Testsaz
 
-A scaffold-and-generate CLI tool for production-grade **Cypress test projects** with Page Object Model, BDD/Cucumber, Allure reporting, and AI-assisted test generation.
+AI-Powered Cypress test generator — scaffold projects and generate production-grade tests with Page Object Model, BDD/Cucumber, Allure reporting, and AI assistance.
 
 This monorepo contains two packages:
 
-| Package                   | Description                                                                               |
-| ------------------------- | ----------------------------------------------------------------------------------------- |
-| `@qa-test-generator/core` | Engine — LLM abstraction, project scaffolding, AI generation, chat, Structure Guide, docs |
-| `@qa-test-generator/cli`  | CLI surface — Commander-based interface (`qa new`, `qa generate`, `qa chat`, etc.)        |
+| Package              | Description                                                               |
+| -------------------- | ------------------------------------------------------------------------- |
+| `@testsaz/core`     | Engine — LLM abstraction, project scaffolding, AI generation, chat, Structure Guide, docs |
+| `@testsaz/cli`      | CLI surface — Commander-based interface (`qa new`, `qa generate`, `qa chat`, etc.)        |
 
 ## Setup
 
@@ -129,6 +129,12 @@ qa autonomous
 
 # With flags
 qa autonomous --base-url "http://localhost:3000" --depth 2 -y
+
+# Only pages with forms
+qa autonomous --base-url "http://localhost:3000" --forms-only -y
+
+# Regression tier
+qa autonomous --base-url "http://localhost:3000" --depth 2 --tier regression -y
 ```
 
 | Option | Description |
@@ -136,6 +142,8 @@ qa autonomous --base-url "http://localhost:3000" --depth 2 -y
 | `--base-url <url>` | Base URL to crawl |
 | `-d, --depth <number>` | Crawl depth (1-3, default: 1) |
 | `-p, --project-root <dir>` | Project root (default: cwd) |
+| `--forms-only` | Only generate tests for pages with forms |
+| `-t, --tier <tier>` | Test tier: smoke (default) or regression |
 | `-y, --yes` | Skip prompts, use defaults |
 
 The crawler launches headless Chromium via Playwright, follows same-origin links up to the specified depth, and reports discovered pages with their links and forms.
@@ -156,6 +164,17 @@ qa hybrid -u "http://localhost:3000/dashboard" -n "Dashboard" \
 # With Structure Guide
 qa hybrid -u "http://localhost:3000/checkout" -n "Checkout" \
     --guide ./guides/my-guide.md -y
+
+# Interactive mode — open browser, interact manually, then analyze
+qa hybrid -u "http://localhost:3000/login" -n "LoginPage" --interactive
+
+# With pre-defined steps file
+qa hybrid -u "http://localhost:3000/dashboard" -n "Dashboard" \
+    --steps-file steps/settings.json -y
+
+# With a pre-written scenario (skip Phase 0)
+qa hybrid -u "http://localhost:3000/login" -n "LoginPage" \
+    --scenario "1. **Visit** /login\n2. **Type** \"admin\" into **username**" -y
 ```
 
 | Option | Description |
@@ -172,6 +191,10 @@ qa hybrid -u "http://localhost:3000/checkout" -n "Checkout" \
 | `--password-selector <selector>` | Password field CSS selector |
 | `--login-button-selector <selector>` | Login button CSS selector |
 | `--wait-for-selector <selector>` | Selector to wait for after login |
+| `--interactive` | Open browser for manual interaction before analysis |
+| `--steps-file <path>` | JSON file with pre-defined steps to execute before analysis |
+| `--scenario <text>` | Pre-written scenario in Markdown (skips Phase 0) |
+| `--scenario-file <path>` | Read scenario from file (skips Phase 0) |
 | `-y, --yes` | Skip prompts, use defaults |
 
 **How it works:**
@@ -204,7 +227,7 @@ qa fix --test cypress/e2e/test/smoke/login.cy.ts -y
 
 ### Page Analyzer (AI-Assisted)
 
-Analyze a live web page and generate test artifacts (locators, page object, test spec). Supports authentication and scenario-based generation.
+Analyze a live web page and generate test artifacts (locators, page object, test spec). Supports authentication, scenario-based generation, and interactive mode.
 
 ```bash
 # Interactive mode
@@ -222,6 +245,9 @@ qa analyze -u "http://app.example.com/Events/AddMember" \
     --username "user" --password "pass" \
     --scenario-file scenarios/addMember.md \
     --name "AddMember" -y
+
+# Interactive mode — open browser, interact manually, then analyze
+qa analyze -u "http://localhost:3000/login" --interactive
 ```
 
 | Option | Description |
@@ -242,8 +268,39 @@ qa analyze -u "http://app.example.com/Events/AddMember" \
 | `--scenario <text>` | Inline scenario text (generates focused artifacts) |
 | `--scenario-file <path>` | Read scenario from file (generates focused artifacts) |
 | `--scenario-output <path>` | Save generated scenario to file |
+| `--interactive` | Open browser for manual interaction before analysis |
+| `--steps-file <path>` | JSON file with pre-defined steps to execute before analysis |
 | `--debug` | Enable debug output |
 | `-y, --yes` | Skip prompts, use defaults |
+
+### Steps File Generator
+
+Generate a JSON steps file for page interactions. Works offline with a local LLM. Use the output with `qa hybrid --steps-file` or `qa analyze --steps-file`.
+
+```bash
+# Interactive mode
+qa steps
+
+# With flags
+qa steps -g "Fill login form and submit" -y
+
+# Custom output path
+qa steps -g "Navigate to settings page" -o "steps/settings.json" -y
+```
+
+| Option | Description |
+|--------|-------------|
+| `-g, --goal <text>` | Description of page interactions |
+| `-o, --output <path>` | Output file path (default: `steps/steps.json`) |
+| `-y, --yes` | Skip prompts, use defaults |
+
+### Usage Examples
+
+Show detailed usage examples for all commands:
+
+```bash
+qa examples
+```
 
 ### Structure Guide (Learn from Existing Projects)
 
@@ -311,17 +368,47 @@ Config is persisted at `~/.qa-test-gen/config.json`.
 
 ### LLM Providers Setup
 
-| Provider     | Type  | Default Port | API Key Required |
-| ------------ | ----- | ------------ | ---------------- |
-| Ollama       | Local | 11434        | No               |
-| LM Studio    | Local | 1234         | No               |
-| llama.cpp    | Local | 8080         | No               |
+| Provider         | Type  | Default Port | API Key Required |
+| ---------------- | ----- | ------------ | ---------------- |
+| Ollama           | Local | 11434        | No               |
+| LM Studio        | Local | 1234         | No               |
+| llama.cpp        | Local | 8080         | No               |
 | OpenAI Providers | Local | 8000         | No               |
-| OpenRouter   | Cloud | —            | Yes              |
-| Gemini       | Cloud | —            | Yes              |
-| OpenCode Zen | Cloud | —            | Yes              |
+| OpenRouter       | Cloud | —            | Yes              |
+| Gemini           | Cloud | —            | Yes              |
+| OpenCode Zen     | Cloud | —            | Yes              |
 
 ## Features
+
+### API Logger
+
+Comprehensive API call logging with beautiful HTML reports. Intercepts all `/api/**` requests and captures full request/response details.
+
+```typescript
+// In your test setup (before each test)
+cy.setupApiLogging();
+
+// After test — attach logs to Allure on failure
+cy.attachApiLogsToAllure();
+
+// Clear logs between tests
+cy.clearApiLogs();
+
+// Get logs programmatically
+cy.getApiLogs().then((logs) => {
+  expect(logs).to.have.length.greaterThan(0);
+});
+
+// Watch for API errors
+cy.watchApiErrors();
+```
+
+Features:
+- Intercepts all `/api/**` requests (excludes localhost)
+- Captures method, URL, headers (sanitized), request/response bodies, status codes, duration
+- Truncates large bodies (max 1000 chars), limits stored calls to 50 (FIFO)
+- Generates HTML report with summary cards and collapsible details
+- Auto-attaches to Allure on test failure
 
 ### Network Stubbing
 
@@ -409,7 +496,7 @@ cy.clickHealed('[data-cy="login-btn"]', ['#login-button']);
 cy.typeHealed('[data-cy="email"]', 'user@example.com', ['#email-input']);
 ```
 
-The `healSelector()` function from `@qa-test-generator/core` provides the underlying logic. Commands are defined in `cypress/support/commands/healing.ts`.
+The `healSelector()` function from `@testsaz/core` provides the underlying logic. Commands are defined in `cypress/support/commands/healing.ts`.
 
 ### Prompt Engineering
 
