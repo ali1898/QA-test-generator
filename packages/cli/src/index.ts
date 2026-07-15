@@ -17,53 +17,7 @@ import { fixCommand, type FixOptions } from "./commands/fix";
 import { hybridCommand, type HybridOptions } from "./commands/hybrid";
 import { stepsCommand, type StepsOptions } from "./commands/steps";
 
-const BANNER =
-    chalk.hex("#ffffff")("\n████████ ") +
-      chalk.hex("#ffffff")("███████ ") +
-      chalk.hex("#ffffff")("███████ ") +
-      chalk.hex("#ffffff")("████████ ") +
-      chalk.hex("#ffffff")("███████ ") +
-      chalk.hex("#ffffff")(" █████  ") +
-      chalk.hex("#ffffff")("███████") + "\n" +
-
-      chalk.hex("#ffffff")("   ██    ") +
-      chalk.hex("#ffffff")("██      ") +
-      chalk.hex("#ffffff")("██      ") +
-      chalk.hex("#ffffff")("   ██    ") +
-      chalk.hex("#ffffff")("██      ") +
-      chalk.hex("#ffffff")("██   ██ ") +
-      chalk.hex("#ffffff")("    ██") + "\n" +
-
-      chalk.hex("#ffffff")("   ██    ") +
-      chalk.hex("#ffffff")("█████   ") +
-      chalk.hex("#ffffff")("███████ ") +
-      chalk.hex("#ffffff")("   ██    ") +
-      chalk.hex("#ffffff")("███████ ") +
-      chalk.hex("#ffffff")("███████ ") +
-      chalk.hex("#ffffff")("  ██") + "\n" +
-
-      chalk.hex("#ffffff")("   ██    ") +
-      chalk.hex("#ffffff")("██      ") +
-      chalk.hex("#ffffff")("     ██ ") +
-      chalk.hex("#ffffff")("   ██    ") +
-      chalk.hex("#ffffff")("     ██ ") +
-      chalk.hex("#ffffff")("██   ██ ") +
-      chalk.hex("#ffffff")("██") + "\n" +
-
-      chalk.hex("#ffffff")("   ██    ") +
-      chalk.hex("#ffffff")("███████ ") +
-      chalk.hex("#ffffff")("███████ ") +
-      chalk.hex("#ffffff")("   ██    ") +
-      chalk.hex("#ffffff")("███████ ") +
-      chalk.hex("#ffffff")("██   ██ ") +
-      chalk.hex("#ffffff")("███████\n") +
-
-  chalk.dim(`  \n\t${chalk.bold.white("AI-Powered Cypress Test Generator")} v${CORE_VERSION}\n`) +
-  chalk.hex("#ffffff")(" \t\tPOM") + chalk.dim(" + ") +
-  chalk.hex("#ffffff")("BDD") + chalk.dim(" + ") +
-  chalk.hex("#ffffff")("Allure") + chalk.dim(" + ") +
-  chalk.hex("#ffffff")("AI") +
-  "\n";
+import { BANNER, printBanner } from "./banner";
 
 const program = new Command();
 
@@ -77,7 +31,7 @@ program
     `\n${chalk.dim("Run 'qa examples' for detailed usage examples with all flags.")}\n`,
   )
   .hook("preAction", () => {
-    // Reserved for future global checks.
+    printBanner();
   });
 
 // ── qa examples ──────────────────────────────────────────────────────────
