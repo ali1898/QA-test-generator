@@ -62,6 +62,8 @@ ${chalk.bold.hex("#48dbfb")("Examples:")}
   $ qa new --name my-app -l typescript --bdd --allure -y
   $ qa new --name my-app --llm-wiki
   $ qa new --name my-app --scenarios -y
+  $ qa new --name my-app --url "http://localhost:3000/dashboard" -y
+  $ qa new --name my-app --url "http://localhost:3000/admin" --login-url "http://localhost:3000/login" --username admin --password secret -y
 
   ${chalk.dim("# \u2014 Generate artifacts with AI \u2014")}
   $ qa g test -g "login with empty fields should show error"
@@ -136,6 +138,8 @@ ${chalk.bold.hex("#48dbfb")("Examples:")}
   $ qa hybrid -u "http://localhost:3000/login" -n "LoginPage" -y
   $ qa hybrid -u "http://localhost:3000/dashboard" -n "Dashboard" \\
       --login-url "http://localhost:3000/login" --username admin --password secret -y
+  $ qa hybrid -u "http://localhost:3000/dashboard" -n "Dashboard" \\
+      --login-url "http://localhost:3000/login" --username admin --password secret --clear-session -y
 
   ${chalk.dim("# \u2014 Fix failing tests \u2014")}
   $ qa fix --test cypress/e2e/test/smoke/login.cy.ts
@@ -196,6 +200,8 @@ program
   .option("--steps-file <path>", "JSON file with pre-defined steps to execute before analysis")
   .option("--scenario <text>", "pre-written scenario in Markdown (skips Phase 0)")
   .option("--scenario-file <path>", "read scenario from file (skips Phase 0)")
+  .option("--clear-session", "clear saved session before proceeding")
+  .option("--no-session", "skip session load/save entirely")
   .action(async (opts) => {
     try {
       await hybridCommand({
@@ -216,6 +222,8 @@ program
         stepsFile: opts.stepsFile,
         scenario: opts.scenario,
         scenarioFile: opts.scenarioFile,
+        clearSession: opts.clearSession,
+        noSession: opts.noSession,
       });
     } catch (err) {
       ui.error(err instanceof Error ? err.message : String(err));
@@ -229,6 +237,7 @@ program
   .description("Scaffold a new Cypress project (POM, BDD, Allure)")
   .option("-n, --name <name>", "project name")
   .option("-p, --path <dir>", "target directory")
+  .option("-f, --file-name <name>", "base name for generated files (test, page, locators)")
   .option("-l, --language <lang>", "typescript | javascript")
   .option("--bdd <bool>", "enable Cucumber BDD", (v) => v !== "false")
   .option("--no-bdd", "disable Cucumber BDD")
@@ -239,6 +248,11 @@ program
   .option("--no-install", "skip running npm install")
   .option("--llm-wiki", "include LLM-Wiki (Structure Guide) from reference project")
   .option("--scenarios", "include sample scenario .md files in scenarios/")
+  .option("--no-git", "skip git initialization")
+  .option("--url <url>", "Target URL to analyze and generate tests for (skips frontend)")
+  .option("--login-url <url>", "Login page URL (for authenticated pages)")
+  .option("--username <text>", "Username for login")
+  .option("--password <text>", "Password for login")
   .option("-y, --yes", "skip prompts, use defaults + provided flags")
   .action(async (opts) => {
     try {
@@ -255,6 +269,12 @@ program
         llmWiki: opts.llmWiki,
         scenarios: opts.scenarios,
         yes: opts.yes,
+        git: opts.git,
+        url: opts.url,
+        loginUrl: opts.loginUrl,
+        username: opts.username,
+        password: opts.password,
+        fileName: opts.fileName,
       });
     } catch (err) {
       ui.error(err instanceof Error ? err.message : String(err));
@@ -332,6 +352,8 @@ program
   .option("-y, --yes", "skip prompts, use defaults + provided flags")
   .option("--interactive", "Open browser for manual interaction before analysis")
   .option("--steps-file <path>", "JSON file with pre-defined steps to execute before analysis")
+  .option("--clear-session", "clear saved session before proceeding")
+  .option("--no-session", "skip session load/save entirely")
   .action(async (opts) => {
     try {
       await analyzeCommand({
@@ -355,6 +377,8 @@ program
         debug: opts.debug,
         interactive: opts.interactive,
         stepsFile: opts.stepsFile,
+        clearSession: opts.clearSession,
+        noSession: opts.noSession,
       });
     } catch (err) {
       ui.error(err instanceof Error ? err.message : String(err));

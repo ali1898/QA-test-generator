@@ -41,8 +41,11 @@ npm run unlink
 ## Quick Start
 
 ```bash
-# Scaffold a new project
+# Scaffold a new project (sample app mode)
 npm run qa -- new -n my-e2e-project -l typescript --bdd --allure --yes
+
+# Scaffold a new project targeting a specific URL (no frontend, page-specific tests)
+npm run qa -- new -n my-dashboard -l typescript --url "http://localhost:3000/dashboard" --yes
 
 # Scaffold with LLM-Wiki for AI generation that follows reference conventions
 npm run qa -- new -n my-e2e-project --llm-wiki
@@ -50,7 +53,7 @@ npm run qa -- new -n my-e2e-project --llm-wiki
 cd my-e2e-project
 npm install
 
-# Terminal 1: Start the sample frontend
+# Terminal 1: Start the sample frontend (only in sample app mode)
 npm run frontend
 
 # Terminal 2: Run smoke tests
@@ -214,6 +217,32 @@ qa hybrid -u "http://localhost:3000/login" -n "LoginPage" \
 2. AI generates comprehensive test scenarios
 3. Post-generation validation ensures consistency (locator names match, method names match)
 4. Abbreviation expansion handles common patterns (Btn→Button, Txt→Text)
+
+### Session Caching
+
+When using `--login-url` with `--username` and `--password`, the browser session (cookies + localStorage) is automatically saved to `~/.qa-sessions/`. On subsequent runs, the saved session is loaded before navigation, avoiding repeated logins.
+
+```bash
+# First run: logs in and saves session
+qa hybrid -u "http://localhost:3000/dashboard" -n "Dashboard" \
+    --login-url "http://localhost:3000/login" \
+    --username admin --password secret -y
+
+# Second run: uses saved session (no re-login needed)
+qa hybrid -u "http://localhost:3000/dashboard" -n "Dashboard" \
+    --login-url "http://localhost:3000/login" \
+    --username admin --password secret -y
+
+# Clear saved session
+qa hybrid -u "http://localhost:3000/dashboard" -n "Dashboard" \
+    --login-url "http://localhost:3000/login" \
+    --username admin --password secret --clear-session -y
+
+# Skip session entirely
+qa hybrid -u "http://localhost:3000/dashboard" -n "Dashboard" \
+    --login-url "http://localhost:3000/login" \
+    --username admin --password secret --no-session -y
+```
 
 ### AI Test Fixer
 

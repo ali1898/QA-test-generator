@@ -40,6 +40,9 @@ using LLM providers (local + cloud).
   - [Accessibility Testing](#accessibility-testing)
   - [Test Isolation](#test-isolation)
   - [Self-Healing Tests](#self-healing-tests)
+  - [Session Caching](#session-caching)
+  - [Git Initialization](#git-initialization)
+  - [URL Mode for qa new](#url-mode-for-qa-new)
   - [Prompt Engineering](#prompt-engineering)
   - [Pipeline Orchestrator](#pipeline-orchestrator)
 - [FAQ & Troubleshooting](#faq--troubleshooting)
@@ -1011,6 +1014,69 @@ cy.clickHealed('[data-cy="login-btn"]', ['#login-button']);
 
 // Type with self-healing
 cy.typeHealed('[data-cy="email"]', 'user@example.com', ['#email-input']);
+```
+
+### Session Caching
+
+When using authentication with `qa hybrid` or `qa analyze`, the browser session (cookies + localStorage) is automatically saved to `~/.qa-sessions/`. This avoids repeated logins on subsequent runs.
+
+**How it works:**
+1. After successful login, the session is saved to `~/.qa-sessions/<domain>.json`
+2. On subsequent runs, the session is loaded before navigation
+3. If the session is valid, login is skipped entirely
+
+**Flags:**
+- `--clear-session` — Delete the saved session before proceeding (forces re-login)
+- `--no-session` — Skip session load/save entirely
+
+**Examples:**
+```bash
+# First run: logs in and saves session
+qa hybrid -u "http://localhost:3000/dashboard" -n "Dashboard" \
+    --login-url "http://localhost:3000/login" \
+    --username admin --password secret -y
+
+# Second run: uses saved session (no re-login)
+qa hybrid -u "http://localhost:3000/dashboard" -n "Dashboard" \
+    --login-url "http://localhost:3000/login" \
+    --username admin --password secret -y
+
+# Clear saved session
+qa hybrid -u "http://localhost:3000/dashboard" -n "Dashboard" \
+    --login-url "http://localhost:3000/login" \
+    --username admin --password secret --clear-session -y
+```
+
+### Git Initialization
+
+`qa new` automatically initializes a git repository with an initial commit after scaffolding. Use `--no-git` to skip this.
+
+```bash
+# With git init (default)
+qa new -n my-project --yes
+
+# Without git init
+qa new -n my-project --no-git --yes
+```
+
+### URL Mode for qa new
+
+When you provide a `--url` flag to `qa new`, the project is scaffolded specifically for that page:
+- No sample frontend app is generated
+- Playwright + AI analyzes the target URL
+- Page-specific locators, page object, and test spec are generated
+- `--name` is required with `--url`
+
+**Examples:**
+```bash
+# Scaffold for a specific page (no frontend)
+qa new -n my-dashboard -l typescript --url "http://localhost:3000/dashboard" -y
+
+# With authentication
+qa new -n my-admin -l typescript \
+    --url "http://localhost:3000/admin" \
+    --login-url "http://localhost:3000/login" \
+    --username admin --password secret -y
 ```
 
 ### Prompt Engineering

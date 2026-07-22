@@ -7,6 +7,7 @@ export interface FileSpec {
 
 const isTs = (o: ScaffoldOptions) => o.language === "typescript";
 const ext = (o: ScaffoldOptions) => (isTs(o) ? "ts" : "js");
+const fileBase = (o: ScaffoldOptions) => o.fileName || o.projectName;
 
 export function packageJson(o: ScaffoldOptions): FileSpec {
   const deps: Record<string, string> = {
@@ -936,8 +937,10 @@ export type { ApiCallLog, ApiRequestLog, ApiResponseLog };
 
 export function locators(o: ScaffoldOptions): FileSpec {
   const e = ext(o);
+  const base = fileBase(o);
+  const constName = `${base.toUpperCase()}_LOCATORS`;
   if (isTs(o)) {
-    const content = `export const LOCATORS = {
+    const content = `export const ${constName} = {
   /** فرم ورود */
   LoginForm: {
     /** فرم */
@@ -975,9 +978,9 @@ export function locators(o: ScaffoldOptions): FileSpec {
   },
 } as const;
 
-export type locators = typeof LOCATORS;
+export type ${base}Locators = typeof ${constName};
 `;
-    return { path: `cypress/e2e/locators/locators.${e}`, content };
+    return { path: `cypress/e2e/locators/${base}Locators.${e}`, content };
   } else {
     const content = `export const LOCATORS = {
   /** فرم ورود */
@@ -1017,18 +1020,22 @@ export type locators = typeof LOCATORS;
   },
 };
 
-module.exports = { LOCATORS };
+module.exports = { ${constName} };
 `;
-    return { path: `cypress/e2e/locators/locators.${e}`, content };
+    return { path: `cypress/e2e/locators/${base}Locators.${e}`, content };
   }
 }
 
 export function loginPage(o: ScaffoldOptions): FileSpec {
   const e = ext(o);
+  const base = fileBase(o);
+  const constName = `${base.toUpperCase()}_LOCATORS`;
+  const className = `${base.charAt(0).toUpperCase() + base.slice(1)}Page`;
+  const singletonName = `${base.charAt(0).toLowerCase() + base.slice(1)}Page`;
   if (isTs(o)) {
-    const content = `import { LOCATORS } from "../locators/locators";
+    const content = `import { ${constName} } from "../locators/${base}Locators";
 
-export class LoginPage {
+export class ${className} {
   /**
    * visit page
    */
@@ -1041,7 +1048,7 @@ export class LoginPage {
    * @param username enter username
    */
   enterUserNameInput(username: string): Cypress.Chainable<JQuery<HTMLElement>> {
-    return cy.getByCy(LOCATORS.LoginForm.Username_Input).type(username);
+    return cy.getByCy(${constName}.LoginForm.Username_Input).type(username);
   }
 
   /**
@@ -1049,14 +1056,14 @@ export class LoginPage {
    * @param password enter password
    */
   enterPasswordInput(password: string): Cypress.Chainable<JQuery<HTMLElement>> {
-    return cy.getByCy(LOCATORS.LoginForm.Password_Input).type(password);
+    return cy.getByCy(${constName}.LoginForm.Password_Input).type(password);
   }
 
   /**
    * click login button
    */
   clickLoginButton(): Cypress.Chainable<JQuery<HTMLElement>> {
-    return cy.getByCy(LOCATORS.LoginForm.Login_Button).click();
+    return cy.getByCy(${constName}.LoginForm.Login_Button).click();
   }
 
   login(username: string, password: string): this {
@@ -1067,27 +1074,27 @@ export class LoginPage {
   }
 }
 
-export const loginPage = new LoginPage();
+export const ${singletonName} = new ${className}();
 `;
-    return { path: `cypress/e2e/pages/loginPage.${e}`, content };
+    return { path: `cypress/e2e/pages/${base}Page.${e}`, content };
   } else {
-    const content = `const { LOCATORS } = require("../locators/locators");
+    const content = `const { ${constName} } = require("../locators/${base}Locators");
 
-class LoginPage {
+class ${className} {
   openLoginPage() {
     return cy.visit("/");
   }
 
   enterUserNameInput(username) {
-    return cy.getByCy(LOCATORS.LoginForm.Username_Input).type(username);
+    return cy.getByCy(${constName}.LoginForm.Username_Input).type(username);
   }
 
   enterPasswordInput(password) {
-    return cy.getByCy(LOCATORS.LoginForm.Password_Input).type(password);
+    return cy.getByCy(${constName}.LoginForm.Password_Input).type(password);
   }
 
   clickLoginButton() {
-    return cy.getByCy(LOCATORS.LoginForm.Login_Button).click();
+    return cy.getByCy(${constName}.LoginForm.Login_Button).click();
   }
 
   login(username, password) {
@@ -1098,10 +1105,10 @@ class LoginPage {
   }
 }
 
-const loginPage = new LoginPage();
-module.exports = { LoginPage, loginPage };
+const ${singletonName} = new ${className}();
+module.exports = { ${className}, ${singletonName} };
 `;
-    return { path: `cypress/e2e/pages/loginPage.${e}`, content };
+    return { path: `cypress/e2e/pages/${base}Page.${e}`, content };
   }
 }
 
@@ -1745,76 +1752,80 @@ main().catch(function (err) {
 
 export function smokeTest(o: ScaffoldOptions): FileSpec {
   const e = ext(o);
+  const base = fileBase(o);
+  const singletonName = `${base.charAt(0).toLowerCase() + base.slice(1)}Page`;
   if (isTs(o)) {
-    const content = `import { loginPage } from "../../pages/loginPage";
+    const content = `import { ${singletonName} } from "../../pages/${base}Page";
 
-describe("Login Page — Smoke Tests", () => {
+describe("${base.charAt(0).toUpperCase() + base.slice(1)} Page — Smoke Tests", () => {
 
   beforeEach(() => {
-    loginPage.openLoginPage();
+    ${singletonName}.openLoginPage();
   });
 
   it("should login successfully with valid credentials", () => {
-    loginPage.login("admin", "123456");
+    ${singletonName}.login("admin", "123456");
     cy.url().should("include", "/dashboard.html");
   });
 
   it("should show error message with invalid credentials", () => {
-    loginPage.login("wrong", "wrong");
+    ${singletonName}.login("wrong", "wrong");
   });
 });
 `;
-    return { path: `cypress/e2e/test/smoke/loginSmoke.cy.${e}`, content };
+    return { path: `cypress/e2e/test/smoke/${base}Test.cy.${e}`, content };
   } else {
-    const content = `const { loginPage } = require("../../pages/loginPage");
+    const content = `const { ${singletonName} } = require("../../pages/${base}Page");
 
-describe("Login Page — Smoke Tests", () => {
+describe("${base.charAt(0).toUpperCase() + base.slice(1)} Page — Smoke Tests", () => {
 
   beforeEach(() => {
-    loginPage.openLoginPage();
+    ${singletonName}.openLoginPage();
   });
 
   it("should login successfully with valid credentials", () => {
-    loginPage.login("admin", "123456");
+    ${singletonName}.login("admin", "123456");
     cy.url().should("include", "/dashboard.html");
   });
 
   it("should show error message with invalid credentials", () => {
-    loginPage.login("wrong", "wrong");
+    ${singletonName}.login("wrong", "wrong");
   });
 });
 `;
-    return { path: `cypress/e2e/test/smoke/loginSmoke.cy.${e}`, content };
+    return { path: `cypress/e2e/test/smoke/${base}Test.cy.${e}`, content };
   }
 }
 
 export function regressionTest(o: ScaffoldOptions): FileSpec {
   const e = ext(o);
+  const base = fileBase(o);
+  const singletonName = `${base.charAt(0).toLowerCase() + base.slice(1)}Page`;
   if (isTs(o)) {
-    const content = `import { loginPage } from "../../pages/loginPage";
+    const content = `import { ${singletonName} } from "../../pages/${base}Page";
 import { sidebar } from "../../pages/sidebar";
 
-describe("Login Page — Regression Tests", () => {
+describe("${base.charAt(0).toUpperCase() + base.slice(1)} Page — Regression Tests", () => {
 
   describe("Login with different users", () => {
     beforeEach(() => {
-      loginPage.openLoginPage();
+      ${singletonName}.openLoginPage();
     });
 
     it("should login as admin user", () => {
-      loginPage.login("admin", "123456");
+      ${singletonName}.login("admin", "123456");
       cy.url().should("include", "/dashboard.html");
     });
 
     it("should reject invalid credentials", () => {
-      loginPage.login("wrong", "wrong");
+      ${singletonName}.login("wrong", "wrong");
     });
   });
 
   describe("Logout", () => {
     beforeEach(() => {
-      loginPage.openLoginPage();
-      loginPage.login("admin", "123456");
+      ${singletonName}.openLoginPage();
+      ${singletonName}.login("admin", "123456");
     });
 
     it("should return to login page after logout", () => {
@@ -1824,32 +1835,32 @@ describe("Login Page — Regression Tests", () => {
   });
 });
 `;
-    return { path: `cypress/e2e/test/regression/loginRegression.cy.${e}`, content };
+    return { path: `cypress/e2e/test/regression/${base}Regression.cy.${e}`, content };
   } else {
-    const content = `const { loginPage } = require("../../pages/loginPage");
+    const content = `const { ${singletonName} } = require("../../pages/${base}Page");
 const { sidebar } = require("../../pages/sidebar");
 
-describe("Login Page — Regression Tests", () => {
+describe("${base.charAt(0).toUpperCase() + base.slice(1)} Page — Regression Tests", () => {
 
   describe("Login with different users", () => {
     beforeEach(() => {
-      loginPage.openLoginPage();
+      ${singletonName}.openLoginPage();
     });
 
     it("should login as admin user", () => {
-      loginPage.login("admin", "123456");
+      ${singletonName}.login("admin", "123456");
       cy.url().should("include", "/dashboard.html");
     });
 
     it("should reject invalid credentials", () => {
-      loginPage.login("wrong", "wrong");
+      ${singletonName}.login("wrong", "wrong");
     });
   });
 
   describe("Logout", () => {
     beforeEach(() => {
-      loginPage.openLoginPage();
-      loginPage.login("admin", "123456");
+      ${singletonName}.openLoginPage();
+      ${singletonName}.login("admin", "123456");
     });
 
     it("should return to login page after logout", () => {
@@ -1859,7 +1870,7 @@ describe("Login Page — Regression Tests", () => {
   });
 });
 `;
-    return { path: `cypress/e2e/test/regression/loginRegression.cy.${e}`, content };
+    return { path: `cypress/e2e/test/regression/${base}Regression.cy.${e}`, content };
   }
 }
 
@@ -1897,31 +1908,34 @@ Feature: ورود به سیستم (Login)
   return { path: "cypress/e2e/features/login.feature", content };
 }
 
-export function sampleStepsTs(): FileSpec {
+export function sampleStepsTs(o: ScaffoldOptions): FileSpec {
+  const base = fileBase(o);
+  const constName = `${base.toUpperCase()}_LOCATORS`;
+  const singletonName = `${base.charAt(0).toLowerCase() + base.slice(1)}Page`;
   const content = `import { Given, When, Then } from "@badeball/cypress-cucumber-preprocessor";
-import { loginPage } from "../pages/loginPage";
-import { LOCATORS } from "../locators/locators";
+import { ${singletonName} } from "../pages/${base}Page";
+import { ${constName} } from "../locators/${base}Locators";
 
 Given("کاربر در صفحه لاگین قرار دارد", () => {
-  loginPage.openLoginPage();
+  ${singletonName}.openLoginPage();
 });
 
 When(
   "نام کاربری {string} و رمز عبور {string} را وارد می‌کند",
   (username: string, password: string) => {
-    loginPage.enterUserNameInput(username);
-    loginPage.enterPasswordInput(password);
+    ${singletonName}.enterUserNameInput(username);
+    ${singletonName}.enterPasswordInput(password);
   }
 );
 
 When("روی دکمه ورود کلیک می‌کند", () => {
-  loginPage.clickLoginButton();
+  ${singletonName}.clickLoginButton();
 });
 
 When(
   "رمز عبور {string} را وارد می‌کند \\(بدون نام کاربری\\)",
   (password: string) => {
-    loginPage.enterPasswordInput(password);
+    ${singletonName}.enterPasswordInput(password);
   }
 );
 
@@ -1934,37 +1948,40 @@ Then("نام {string} در داشبورد نمایش داده می‌شود", (f
 });
 
 Then("پیام خطای معتبر نمایش داده می‌شود", () => {
-  cy.getByCy(LOCATORS.LoginForm.Error_Message).should("be.visible");
+  cy.getByCy(${constName}.LoginForm.Error_Message).should("be.visible");
 });
 `;
-  return { path: "cypress/e2e/step-definitions/loginSteps.ts", content };
+  return { path: `cypress/e2e/step-definitions/${base}Steps.ts`, content };
 }
 
-export function sampleStepsJs(): FileSpec {
+export function sampleStepsJs(o: ScaffoldOptions): FileSpec {
+  const base = fileBase(o);
+  const constName = `${base.toUpperCase()}_LOCATORS`;
+  const singletonName = `${base.charAt(0).toLowerCase() + base.slice(1)}Page`;
   const content = `const { Given, When, Then } = require("@badeball/cypress-cucumber-preprocessor");
-const { loginPage } = require("../pages/loginPage");
-const { LOCATORS } = require("../locators/locators");
+const { ${singletonName} } = require("../pages/${base}Page");
+const { ${constName} } = require("../locators/${base}Locators");
 
 Given("کاربر در صفحه لاگین قرار دارد", () => {
-  loginPage.openLoginPage();
+  ${singletonName}.openLoginPage();
 });
 
 When(
   "نام کاربری {string} و رمز عبور {string} را وارد می‌کند",
   (username, password) => {
-    loginPage.enterUserNameInput(username);
-    loginPage.enterPasswordInput(password);
+    ${singletonName}.enterUserNameInput(username);
+    ${singletonName}.enterPasswordInput(password);
   }
 );
 
 When("روی دکمه ورود کلیک می‌کند", () => {
-  loginPage.clickLoginButton();
+  ${singletonName}.clickLoginButton();
 });
 
 When(
   "رمز عبور {string} را وارد می‌کند \\(بدون نام کاربری\\)",
   (password) => {
-    loginPage.enterPasswordInput(password);
+    ${singletonName}.enterPasswordInput(password);
   }
 );
 
@@ -1977,10 +1994,10 @@ Then("نام {string} در داشبورد نمایش داده می‌شود", (f
 });
 
 Then("پیام خطای معتبر نمایش داده می‌شود", () => {
-  cy.getByCy(LOCATORS.LoginForm.Error_Message).should("be.visible");
+  cy.getByCy(${constName}.LoginForm.Error_Message).should("be.visible");
 });
 `;
-  return { path: "cypress/e2e/step-definitions/loginSteps.js", content };
+  return { path: `cypress/e2e/step-definitions/${base}Steps.js`, content };
 }
 
 export function fixturesUsers(_o: ScaffoldOptions): FileSpec {

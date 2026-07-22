@@ -30,6 +30,9 @@ export interface AnalyzeOptions {
   // Interactive
   interactive?: boolean;
   stepsFile?: string;
+  // Session
+  clearSession?: boolean;
+  noSession?: boolean;
 }
 
 const SKIP_WORDS = ["optional", "none", "skip", "no", "n/a", "-"];
@@ -86,6 +89,8 @@ export async function analyzeCommand(opts: AnalyzeOptions): Promise<void> {
       passwordSelector: opts.passwordSelector,
       loginButtonSelector: opts.loginButtonSelector,
       waitForSelector: opts.waitForSelector,
+      useSession: !opts.noSession,
+      clearSession: opts.clearSession,
     };
   } else if (!opts.yes) {
     // No explicit auth - ask interactively
@@ -104,6 +109,8 @@ export async function analyzeCommand(opts: AnalyzeOptions): Promise<void> {
         auth.loginButtonSelector = await promptOptional("Login button selector (optional, press Enter for auto-detect):") || undefined;
         auth.waitForSelector = await promptOptional("Selector to wait for after login (e.g., dashboard element, optional):") || undefined;
       }
+      auth.useSession = !opts.noSession;
+      auth.clearSession = opts.clearSession;
     }
   }
 

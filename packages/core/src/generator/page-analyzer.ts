@@ -11,6 +11,7 @@ import type { StructureMeta } from "./structure-guide";
 import { QA_SYSTEM_PROMPT, buildSystemPrompt } from "./prompts";
 import type { StepsConfig } from "./types";
 import { executeSteps } from "./steps-executor";
+import { loadSession, saveSession, clearSession, sessionExists } from "./session-store";
 
 export interface PageElement {
   tag: string;
@@ -78,6 +79,10 @@ export interface AuthOptions {
   customAuth?: (page: Page) => Promise<void>;
   /** Enable debug logging */
   debug?: boolean;
+  /** Use saved session if available (default: true) */
+  useSession?: boolean;
+  /** Clear saved session before proceeding */
+  clearSession?: boolean;
 }
 
 export interface AnalyzeOptions {
@@ -350,6 +355,17 @@ async function performAuthentication(page: Page, auth: AuthOptions): Promise<voi
       await page.waitForLoadState("networkidle");
     }
     if (auth.debug) console.log(`[qa] DEBUG: Login complete (current URL: ${page.url()})`);
+
+    // Save session after successful login
+    if (auth.useSession !== false) {
+      try {
+        const storageState = await page.context().storageState();
+        saveSession(auth.loginUrl || page.url(), storageState);
+        if (auth.debug) console.log(`[qa] DEBUG: Session saved for ${auth.loginUrl}`);
+      } catch (err) {
+        if (auth.debug) console.log(`[qa] DEBUG: Failed to save session: ${err}`);
+      }
+    }
   }
 }
 
@@ -365,6 +381,20 @@ async function analyzePage(url: string, options: AnalyzeOptions = {}): Promise<P
     });
     const page = await context.newPage();
 
+    // Load saved session if available
+    if (auth && auth.useSession !== false) {
+      if (auth.clearSession) {
+        clearSession(auth.loginUrl || url);
+        if (debug) console.log(`[qa] DEBUG: Cleared saved session`);
+      } else if (sessionExists(auth.loginUrl || url)) {
+        const savedSession = loadSession(auth.loginUrl || url);
+        if (savedSession) {
+          if (debug) console.log(`[qa] DEBUG: Loading saved session`);
+          await context.addCookies(savedSession.cookies);
+        }
+      }
+    }
+
     // Handle authentication if provided
     if (auth) {
       if (debug) console.log(`[qa] DEBUG: Performing authentication`);
@@ -372,19 +402,24 @@ async function analyzePage(url: string, options: AnalyzeOptions = {}): Promise<P
     }
 
     if (debug) console.log(`[qa] DEBUG: Navigating to target URL: ${url}`);
-    await page.goto(url, { waitUntil: "networkidle", timeout: 60000 });
+
+    // Check if already on target URL after auth (avoids redundant goto)
+    const currentUrl = page.url();
+    const targetUrlObj = new URL(url);
+    if (currentUrl.includes(targetUrlObj.pathname)) {
+      if (debug) console.log(`[qa] DEBUG: Already on target page after auth, skipping navigation`);
+    } else {
+      await page.goto(url, { waitUntil: "networkidle", timeout: 60000 });
+    }
 
     // Verify we're on the target page (not redirected to login)
     const targetPath = new URL(url).pathname;
-    const currentUrl = page.url();
-    if (auth && !currentUrl.includes(targetPath)) {
-      if (debug) console.log(`[qa] DEBUG: Redirected to ${currentUrl} instead of target, re-authenticating...`);
+    const finalUrlAfterNav = page.url();
+    if (auth && !finalUrlAfterNav.includes(targetPath)) {
+      if (debug) console.log(`[qa] DEBUG: Redirected to ${finalUrlAfterNav} instead of target`);
 
-      // Re-authenticate
-      await performAuthentication(page, { ...auth, debug });
-
-      // Retry: try SPA-friendly navigation first (avoids full page reload)
-      if (debug) console.log(`[qa] DEBUG: Retrying navigation via SPA pushState...`);
+      // Try SPA navigation first
+      if (debug) console.log(`[qa] DEBUG: Trying SPA navigation...`);
       await page.evaluate(
         `(function() {
           var parsed = new URL("${url}", window.location.origin);
@@ -392,13 +427,25 @@ async function analyzePage(url: string, options: AnalyzeOptions = {}): Promise<P
           window.dispatchEvent(new PopStateEvent('popstate'));
         })()`
       );
-
       await page.waitForLoadState("networkidle").catch(() => {});
 
       // If still not on target, fall back to goto
       if (!page.url().includes(targetPath)) {
-        if (debug) console.log(`[qa] DEBUG: SPA navigation failed, falling back to page.goto...`);
+        if (debug) console.log(`[qa] DEBUG: SPA failed, falling back to goto...`);
         await page.goto(url, { waitUntil: "networkidle", timeout: 60000 });
+      }
+    }
+
+    // Restore localStorage from saved session
+    if (auth && auth.useSession !== false) {
+      const savedSession = loadSession(auth.loginUrl || url);
+      if (savedSession?.localStorage) {
+        await page.evaluate((storage) => {
+          Object.entries(storage).forEach(([key, value]) => {
+            (globalThis as any).localStorage.setItem(key, value);
+          });
+        }, savedSession.localStorage);
+        if (debug) console.log(`[qa] DEBUG: Restored localStorage from saved session`);
       }
     }
 
@@ -737,6 +784,7 @@ interface ScenarioGenContext {
   locConstName: string;
   pageClassName: string;
   pageSingletonName: string;
+  pageFileName: string;
   locToPageImport: string;
   url: string;
   tier: string;
@@ -779,6 +827,7 @@ ${elementSummary}
 3. Use the detected element selectors when they match scenario elements (prefer data-cy > id > name > placeholder > CSS)
 4. For elements mentioned in the scenario but not detected, create reasonable selectors based on context
 5. IMPORTANT: Locator names must be UPPER_SNAKE_CASE and match exactly what the page object will reference. Use consistent naming (e.g., LOGIN_BUTTON not LOGIN)
+6. CRITICAL: File name MUST be camelCase (e.g., loginLocators.ts, NOT LoginLocators.ts). Export const is UPPER_SNAKE_CASE. Export type uses camelCase (e.g., export type loginLocators = typeof LOGIN_LOCATORS)
 
 ## Format:
 - Export const: ${ctx.locConstName}
@@ -818,6 +867,7 @@ ${scenario}
 4. CRITICAL: When referencing locators, use EXACTLY the same names as defined in the locators file. Do NOT rename or shorten them. If the locators file has DOWNLOAD_CENTER_BUTTON, use DOWNLOAD_CENTER_BUTTON, not DOWNLOAD_CENTER.
 5. Each method returns Cypress.Chainable<JQuery<HTMLElement>>
 6. Add a visit() method that navigates to ${ctx.url}
+7. CRITICAL: File name MUST be camelCase (e.g., loginPage.ts, NOT LoginPage.ts). Class name is PascalCase (e.g., LoginPage). Singleton is camelCase (e.g., export const loginPage = new LoginPage())
 
 ## Format:
 import { ${ctx.locConstName} } from "${ctx.locToPageImport}";
@@ -839,7 +889,7 @@ export const ${ctx.pageSingletonName} = new ${ctx.pageClassName}();`;
   // Phase 3: Generate test spec
   if (ctx.debug) console.log(`[qa] DEBUG: [Scenario] Phase 3 — Generating test spec...`);
   const testSingletonName = ctx.pageSingletonName;
-  const testImportPath = `../../pages/${ctx.baseName}Page`;
+  const testImportPath = `../../pages/${ctx.pageFileName}`;
 
   const testPrompt = `You are generating a Cypress test spec file in TypeScript.
 Page URL: ${ctx.url}
@@ -860,6 +910,7 @@ ${scenario}
 6. Add assertions for verification steps using cy.get/cy.contains
 7. Do NOT use cy.getByCy directly — use page methods only
 8. IMPORTANT: Method names must match EXACTLY with the page object. If the page object has clickDownloadCenter(), use clickDownloadCenter(), NOT clickDownloadCenterButton()
+9. CRITICAL: File name MUST be camelCase (e.g., login.cy.ts, NOT Login.cy.ts)
 
 ## Format:
 import { ${testSingletonName} } from "${testImportPath}";
@@ -1057,8 +1108,11 @@ export async function analyzeAndGenerate(
   const baseName = sanitizeName(namingSource);
   const pageName = toPascalCase(namingSource);
 
+  // Normalize: if name already ends with "Page", don't add it again
+  const className = pageName.endsWith("Page") ? pageName : `${pageName}Page`;
+
   const locConstName = `${pageName.toUpperCase()}_LOCATORS`;
-  const pageClassName = `${pageName}Page`;
+  const pageClassName = className;
   const pageSingletonName = camelCase(pageClassName);
 
   const locRelPath = guideCtx
@@ -1070,6 +1124,9 @@ export async function analyzeAndGenerate(
   const testRelPath = guideCtx
     ? resolveArtifactPath(guideCtx.meta, "test", baseName, options.tier)
     : `cypress/e2e/test/${options.tier ?? "smoke"}/${baseName}.cy.ts`;
+
+  // Page file name for imports (must match actual written file)
+  const pageFileName = baseName + "Page";
 
   const locFileName = locRelPath.split("/").pop()!.replace(/\.ts$/, "");
   const locToPageImport = `../locators/${locFileName}`;
@@ -1094,6 +1151,7 @@ export async function analyzeAndGenerate(
     locConstName,
     pageClassName,
     pageSingletonName,
+    pageFileName,
     locToPageImport,
     url,
     tier: options.tier ?? "smoke",
@@ -1103,6 +1161,17 @@ export async function analyzeAndGenerate(
   locContent = generated.locContent;
   pageContent = generated.pageContent;
   testContent = generated.testContent;
+
+  // Fallback: if LLM returned empty content, generate basic stubs
+  if (!locContent || locContent.trim().length < 10) {
+    locContent = `export const ${locConstName} = {\n  /** TODO: Add locators */\n} as const;\n\nexport type ${pageName}Locators = typeof ${locConstName};\n`;
+  }
+  if (!pageContent || pageContent.trim().length < 10) {
+    pageContent = `import { ${locConstName} } from "${locToPageImport}";\n\nexport class ${pageClassName} {\n  visit(): Cypress.Chainable<Cypress.AUTWindow> {\n    return cy.visit("${url}");\n  }\n}\n\nexport const ${pageSingletonName} = new ${pageClassName}();\n`;
+  }
+  if (!testContent || testContent.trim().length < 10) {
+    testContent = `import { ${pageSingletonName} } from "../../pages/${baseName}Page";\n\ndescribe("${pageName} - ${options.tier ?? "smoke"} tests", () => {\n  beforeEach(() => {\n    ${pageSingletonName}.visit();\n  });\n\n  it("should load the page", () => {\n    // TODO: Add assertions\n  });\n});\n`;
+  }
 
   console.log(`[qa] Generating locators...`);
   const absLocPath = writeArtifact(options.projectRoot, locRelPath, locContent);

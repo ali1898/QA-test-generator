@@ -22,6 +22,8 @@ export interface HybridOptions {
   stepsFile?: string;
   scenario?: string;
   scenarioFile?: string;
+  clearSession?: boolean;
+  noSession?: boolean;
 }
 
 export async function hybridCommand(opts: HybridOptions): Promise<void> {
@@ -120,6 +122,8 @@ export async function hybridCommand(opts: HybridOptions): Promise<void> {
         passwordSelector,
         loginButtonSelector,
         waitForSelector,
+        useSession: !opts.noSession,
+        clearSession: opts.clearSession,
       } : undefined,
       interactive: opts.interactive,
       steps: stepsConfig,
@@ -141,6 +145,8 @@ export async function hybridCommand(opts: HybridOptions): Promise<void> {
           passwordSelector,
           loginButtonSelector,
           waitForSelector,
+          useSession: !opts.noSession,
+          clearSession: opts.clearSession,
         } : undefined,
         interactive: opts.interactive,
         steps: stepsConfig,

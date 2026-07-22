@@ -60,8 +60,8 @@ const DEFAULT_META: StructureMeta = {
   },
   namingPatterns: {
     test: "{name}.cy.ts",
-    page: "{Pascal}Page.ts",
-    locators: "{Pascal}Locators.ts",
+    page: "{camel}Page.ts",
+    locators: "{camel}Locators.ts",
     helper: "{camel}Helper.helper.ts",
     bdd: "{name}.feature",
     bddSteps: "{Pascal}Steps.ts",

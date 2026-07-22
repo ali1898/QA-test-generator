@@ -11,6 +11,8 @@ export const scaffoldOptionsSchema = z.object({
   targetDir: z.string(),
   /** npm package name for the generated project. */
   projectName: z.string(),
+  /** Base name for generated files (locators, page, tests). Defaults to projectName. */
+  fileName: z.string().default(""),
   /** Human-readable description for package.json / README. */
   description: z.string().default(""),
   /** TypeScript or JavaScript test files. */
@@ -27,6 +29,20 @@ export const scaffoldOptionsSchema = z.object({
   llmWiki: z.boolean().default(false),
   /** Include sample scenario markdown files in scenarios/. */
   scenarios: z.boolean().default(false),
+  /** Initialize git repository with initial commit. */
+  initGit: z.boolean().default(true),
+  /** URL to analyze and generate tests for (disables frontend generation). */
+  url: z.string().optional(),
+  /** Auth options for URL mode. */
+  auth: z.object({
+    loginUrl: z.string().optional(),
+    username: z.string().optional(),
+    password: z.string().optional(),
+    usernameSelector: z.string().optional(),
+    passwordSelector: z.string().optional(),
+    loginButtonSelector: z.string().optional(),
+    waitForSelector: z.string().optional(),
+  }).optional(),
 });
 
 export type ScaffoldOptions = z.infer<typeof scaffoldOptionsSchema>;

@@ -60,6 +60,7 @@ export {
 export { crawlSite, type CrawlResult, type CrawlElements } from "./generator/crawler";
 export { hybridGenerate, type HybridOptions } from "./generator/hybrid";
 export { launchBrowser, detectSystemBrowsers } from "./generator/browser-launcher";
+export { sessionExists, loadSession, saveSession, clearSession } from "./generator/session-store";
 export {
   runPipeline,
   runParallelStages,

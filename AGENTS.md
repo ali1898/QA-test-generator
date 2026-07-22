@@ -365,6 +365,26 @@ qa analyze --url <URL> --interactive
   4. **Form filtering**: Forms are also filtered to only include forms containing tracked elements
 - **Files**: `packages/core/src/generator/page-analyzer.ts` (analyzePage function, lines 418-544)
 
+### Session-based Login Caching
+- **Problem**: Every `qa hybrid`/`qa analyze` run with authentication must re-login. Slow and fragile for sites with complex auth flows (2FA, CAPTCHA, OAuth).
+- **Fix**: Added `session-store.ts` module that saves Playwright `BrowserContext.storageState()` to `~/.qa-sessions/<domain>.json`. After successful login, session is auto-saved. On subsequent runs, session is auto-loaded before navigation. `--clear-session` flag to delete saved session, `--no-session` to skip entirely.
+- **Files**: `packages/core/src/generator/session-store.ts`, `packages/core/src/generator/page-analyzer.ts`
+
+### Git Initialization
+- **Problem**: `qa new` projects had `.gitignore` but no git repository initialized.
+- **Fix**: Auto `git init` + `git add .` + `git commit` after scaffolding. `--no-git` flag to skip.
+- **Files**: `packages/core/src/generator/scaffold.ts`
+
+### URL Mode for qa new
+- **Problem**: `qa new` always created projects with a sample frontend app. Users wanted to scaffold projects targeting specific real URLs with page-specific tests.
+- **Fix**: Added `--url` flag to `qa new`. When provided, skips frontend generation, uses Playwright + AI to analyze the target URL, and generates page-specific locators, page object, and test spec. `--name` is required with `--url`.
+- **Files**: `packages/cli/src/commands/new.ts`, `packages/core/src/generator/scaffold.ts`
+
+### camelCase File Naming
+- **Problem**: Generated files used inconsistent naming (uppercase vs camelCase). Import paths were incorrect in some cases.
+- **Fix**: Updated default naming patterns to use `{camel}` for pages and locators (e.g., `loginPage.ts`, `loginLocators.ts`). Fixed import path calculation to match actual file names. Updated LLM prompts to enforce camelCase file naming.
+- **Files**: `packages/core/src/generator/structure-guide.ts`, `packages/core/src/generator/page-analyzer.ts`
+
 ## Generated Project Structure
 
 The output of `qa new` produces a Cypress project with:
@@ -410,11 +430,11 @@ POM layers strictly separated: locators → pages → tests. Data flow: tests ca
 
 | Command | Description |
 |---------|-------------|
-| `qa new` | Scaffold a Cypress project (interactive or `--yes`, `--llm-wiki`, `--scenarios`) |
+| `qa new` | Scaffold a Cypress project. **URL mode**: `--url <URL>` skips frontend, uses Playwright + AI to generate page-specific tests. Also supports `--no-git`, `--login-url`, `--username`, `--password`. |
 | `qa generate <type>` | Generate with AI: test/page/locators/helper/command/bdd/all (supports `--url`, `--guide`, `--tier`, `--scenario`, `--scenario-file`, `--name`, `--yes`) |
-| `qa analyze` | **Analyze a live web page via Playwright and generate locators, page object, and test spec. Supports authentication (`--login-url`, `--username`, `--password`), scenario-based generation (`--scenario`, `--scenario-file`), and interactive mode (`--interactive`) for dynamic pages.** |
+| `qa analyze` | **Analyze a live web page via Playwright and generate locators, page object, and test spec. Supports authentication (`--login-url`, `--username`, `--password`), session caching (`--clear-session`, `--no-session`), scenario-based generation (`--scenario`, `--scenario-file`), and interactive mode (`--interactive`) for dynamic pages.** |
 | `qa autonomous` / `qa auto` | **Crawl a website and discover pages for autonomous test generation (supports `--base-url`, `--depth`, `--yes`)** |
-| `qa hybrid` | **Analyze page with Playwright + generate tests with AI (best accuracy). Supports `--url`, `--name`, `--login-url`, `--username`, `--password`, `--tier`, `--guide`, `--yes`, `--interactive`, `--steps-file`** |
+| `qa hybrid` | **Analyze page with Playwright + generate tests with AI (best accuracy). Supports `--url`, `--name`, `--login-url`, `--username`, `--password`, `--tier`, `--guide`, `--yes`, `--interactive`, `--steps-file`, `--clear-session`, `--no-session`** |
 | `qa steps` | **Generate steps JSON file for page interactions (offline with local LLM). Supports `--guide`, `--goal`, `--yes`** |
 | `qa fix` | **Analyze a failing test and suggest a fix with AI (supports `--test`, `--report`, `--yes`)** |
 | `qa generate-guide` / `qa gg` | Create Structure Guide from existing project (interactive or `--yes`) |
